@@ -1,0 +1,137 @@
+---
+sidebar_position: 2
+---
+
+## The Voice-to-Action Pipeline
+
+The core of a VLA system that responds to spoken commands is the **Voice-to-Action pipeline**. This pipeline transforms ephemeral human speech into concrete, executable robot commands. It typically involves three main stages: voice recognition, intent extraction, and task breakdown.
+
+### Whisper for Voice Recognition
+
+The first step in any voice-controlled system is converting spoken words into text. **OpenAI Whisper** is an excellent general-purpose speech recognition model that excels at this task. It is robust to accents, background noise, and technical language, making it highly suitable for robotics applications.
+
+Whisper can be run locally on your machine (including on a GPU for faster inference) or accessed via an API. For robotics, a local, real-time implementation is often preferred.
+
+**How it works (simplified)**:
+1.  **Audio Input**: The robot's microphone captures raw audio.
+2.  **Preprocessing**: The audio is processed (e.g., sampled, filtered) and fed into the Whisper model.
+3.  **Transcription**: Whisper outputs a text string representing the spoken command.
+
+**Code Example (Python with `whisper` library)**:
+
+```python
+import whisper
+
+def transcribe_audio(audio_file_path):
+    """
+    Transcribes an audio file using OpenAI's Whisper model.
+    """
+    model = whisper.load_model("base") # or "small", "medium", "large" for better accuracy
+    result = model.transcribe(audio_file_path)
+    return result["text"]
+
+# Example usage:
+# if __name__ == "__main__":
+#     text = transcribe_audio("my_voice_command.wav")
+#     print(f"Transcription: {text}")
+```
+This transcribed text then becomes the input for the next stages of the pipeline.
+
+### Intent Extraction from Language
+
+Once we have the command in text format, the robot needs to understand what the user *intends* for it to do. This is called **intent extraction**. It involves parsing the natural language command to identify the core action, objects involved, and any modifiers or constraints.
+
+For example, if the command is "Go to the kitchen table and pick up the blue mug":
+*   **Intent**: Navigate, Pick Up
+*   **Target Locations**: Kitchen table
+*   **Target Objects**: Blue mug
+*   **Constraints**: Color (blue)
+
+LLMs are exceptionally good at intent extraction. You can prompt an LLM with the transcribed command and ask it to output a structured representation of the intent.
+
+**LLM Prompt Example**:
+
+```
+User command: "Go to the kitchen table and pick up the blue mug."
+
+Extract the robot's intent, specifying actions, target locations, and target objects. Respond in JSON format.
+
+{
+  "actions": [
+    {"type": "navigate", "location": "kitchen table"},
+    {"type": "pick_up", "object": {"name": "mug", "color": "blue"}}
+  ]
+}
+```
+The LLM would then return a JSON object (or similar structured output) that a robotic system can easily parse.
+
+### Creating Task Breakdowns Using LLMs
+
+Many human commands are high-level and abstract. A robot cannot directly execute "Clean the room." It needs a **task breakdown**—a sequence of smaller, specific, and executable actions. LLMs are powerful tools for this hierarchical planning.
+
+Given a high-level intent, an LLM can generate a series of sub-tasks. This often involves:
+*   **Decomposition**: Breaking a large task into smaller, manageable steps.
+*   **Ordering**: Arranging these steps in a logical sequence.
+*   **Refinement**: Adding details or conditions to each step.
+
+**Example: "Clean the room" → Action Graph**
+
+Let's consider the command: "Clean the room." An LLM, perhaps with some pre-defined context about the robot's capabilities and the room's layout, could generate the following task breakdown:
+
+```json
+{
+  "high_level_command": "Clean the room",
+  "task_graph": [
+    {
+      "id": "1",
+      "action": "navigate_to_location",
+      "parameters": {"location": "living_room_center"},
+      "dependencies": []
+    },
+    {
+      "id": "2",
+      "action": "identify_and_localize_objects",
+      "parameters": {"objects_of_interest": ["cup", "book", "remote"]},
+      "dependencies": ["1"]
+    },
+    {
+      "id": "3",
+      "action": "pick_up_object",
+      "parameters": {"object_id": "cup_01"},
+      "dependencies": ["2"]
+    },
+    {
+      "id": "4",
+      "action": "navigate_to_location",
+      "parameters": {"location": "kitchen_sink"},
+      "dependencies": ["3"]
+    },
+    {
+      "id": "5",
+      "action": "place_object",
+      "parameters": {"location": "kitchen_sink"},
+      "dependencies": ["4"]
+    },
+    {
+      "id": "6",
+      "action": "pick_up_object",
+      "parameters": {"object_id": "book_01"},
+      "dependencies": ["5"]
+    },
+    {
+      "id": "7",
+      "action": "navigate_to_location",
+      "parameters": {"location": "bookshelf"},
+      "dependencies": ["6"]
+    },
+    {
+      "id": "8",
+      "action": "place_object",
+      "parameters": {"location": "bookshelf"},
+      "dependencies": ["7"]
+    }
+    // ... more steps for other objects
+  ]
+}
+```
+This structured task breakdown, effectively an action graph, can then be executed by a robot's control system. Each "action" in the graph corresponds to a low-level capability the robot possesses, often implemented as a ROS 2 Action Server, which we will explore further.

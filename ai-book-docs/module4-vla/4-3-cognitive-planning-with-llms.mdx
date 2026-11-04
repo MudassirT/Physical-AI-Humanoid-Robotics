@@ -1,0 +1,124 @@
+---
+sidebar_position: 3
+---
+
+## Cognitive Planning with LLMs
+
+The previous section demonstrated how Large Language Models (LLMs) can be used to extract intent and break down high-level commands into a structured sequence of tasks. This section dives deeper into **Cognitive Planning with LLMs**, focusing on how these abstract task breakdowns are translated into concrete, executable ROS 2 actions for a robot, and the critical importance of safety layers.
+
+### Translating Commands into ROS 2 Actions
+
+For a robot to execute an LLM-generated plan, each high-level action in the plan (e.g., `navigate_to_location`, `pick_up_object`) must correspond to a low-level capability the robot possesses. In ROS 2, these capabilities are often exposed through **Action Servers**.
+
+An **Action Server** provides a goal-based interface for long-running, cancellable robot tasks. For example:
+*   A `NavigateToPose` action server would handle the robot moving to a specific (x, y, theta) location.
+*   A `GraspObject` action server would manage the sequence of movements required to approach, grasp, and lift an object.
+*   A `DetectObject` action server might handle waiting for a specific object to appear in the camera feed.
+
+The role of the cognitive planner is to map the LLM's output (e.g., the JSON task graph from the previous section) to the available ROS 2 Action Servers. This typically involves:
+
+1.  **Parsing LLM Output**: Extracting the `action` type and its `parameters` from the LLM's structured response.
+2.  **Action Goal Construction**: Creating an instance of the appropriate ROS 2 action goal message type (e.g., `NavigateToPose.Goal`, `GraspObject.Goal`) and populating its fields with the extracted parameters.
+3.  **Action Client Interaction**: Using a ROS 2 Action Client to send the goal to the corresponding Action Server. The client can then monitor the progress of the action and receive results or feedback.
+
+### Example: "Pick up the cup" → Planning Steps
+
+Let's break down the command "Pick up the cup" into a sequence of ROS 2 actions, assuming a pre-trained LLM provides the high-level plan and an object detection system (like Isaac ROS DetectNet) can locate the cup.
+
+**High-Level Goal**: Pick up the cup.
+
+**LLM-generated Task Breakdown (Conceptual)**:
+
+```json
+[
+  {"action": "find_object", "object_type": "cup"},
+  {"action": "navigate_to_object", "object_type": "cup"},
+  {"action": "grasp_object", "object_type": "cup"},
+  {"action": "lift_object"}
+]
+```
+
+**Translation to ROS 2 Actions (Python pseudocode)**:
+
+```python
+import rclpy
+from rclpy.action import ActionClient
+from my_robot_interfaces.action import FindObject, NavigateToPose, GraspObject, LiftObject # Custom ROS 2 Actions
+
+class CognitivePlanner:
+    def __init__(self):
+        self.node = rclpy.create_node('cognitive_planner')
+        self.find_object_client = ActionClient(self.node, FindObject, 'find_object_action')
+        self.navigate_client = ActionClient(self.node, NavigateToPose, 'navigate_to_pose_action')
+        self.grasp_client = ActionClient(self.node, GraspObject, 'grasp_object_action')
+        self.lift_client = ActionClient(self.node, LiftObject, 'lift_object_action')
+        # ... other clients
+
+    async def execute_llm_plan(self, llm_plan_json):
+        for step in llm_plan_json:
+            action_type = step["action"]
+            params = step.get("parameters", {})
+
+            if action_type == "find_object":
+                goal = FindObject.Goal()
+                goal.object_type = params["object_type"]
+                # Send goal and await result (object_pose)
+                # If found, proceed, else handle failure
+                self.node.get_logger().info(f"Finding {goal.object_type}...")
+                await self.find_object_client.wait_for_server()
+                future = self.find_object_client.send_goal_async(goal)
+                response = await future.result()
+                if response.accepted:
+                    self.node.get_logger().info(f"Found {goal.object_type} at {response.result.object_pose}")
+                    object_pose_to_grasp = response.result.object_pose # Store for next step
+                else:
+                    self.node.get_logger().error(f"Failed to find {goal.object_type}")
+                    return False # Plan failed
+            elif action_type == "navigate_to_object":
+                # Assuming object_pose_to_grasp is available
+                goal = NavigateToPose.Goal()
+                goal.pose = object_pose_to_grasp # Use detected pose
+                # Send goal and await result
+                self.node.get_logger().info(f"Navigating to object...")
+                await self.navigate_client.wait_for_server()
+                future = self.navigate_client.send_goal_async(goal)
+                response = await future.result()
+                if not response.accepted:
+                    self.node.get_logger().error(f"Failed to navigate")
+                    return False
+            # ... similar logic for grasp_object and lift_object
+        return True # Plan executed successfully
+
+# if __name__ == '__main__':
+#     rclpy.init()
+#     planner = CognitivePlanner()
+#     # Example LLM output
+#     llm_plan = [{"action": "find_object", "object_type": "cup"}, 
+#                 {"action": "navigate_to_object"}, 
+#                 {"action": "grasp_object"}, 
+#                 {"action": "lift_object"}]
+#     rclpy.spin_until_future_complete(planner.node, planner.execute_llm_plan(llm_plan))
+#     rclpy.shutdown()
+```
+
+### Safety Layers & Verification
+
+Directly translating LLM outputs into robot actions without careful consideration is extremely risky. LLMs can "hallucinate," generate unsafe commands, or misinterpret context. Therefore, robust **safety layers and verification mechanisms** are paramount.
+
+Key strategies include:
+
+*   **Semantic Parsing & Validation**:
+    *   **Schema Enforcement**: Ensure the LLM always outputs commands in a predefined structured format (e.g., JSON schema). Reject any output that doesn't conform.
+    *   **Parameter Validation**: Verify that the parameters for each action are valid (e.g., a "speed" parameter is within safe limits, a "location" is reachable).
+*   **Feasibility Checks**:
+    *   Before executing an action, check if it's physically possible and safe given the robot's current state and environment. Can the robot reach that object? Is the path clear?
+    *   This involves querying the robot's perception system and internal state.
+*   **Human-in-the-Loop**:
+    *   For critical or ambiguous commands, prompt the human user for confirmation or clarification. "Did you mean the red cup on the left or the right?"
+    *   Allow for an "emergency stop" or "override" mechanism at any point.
+*   **Guardrails & Constraints**:
+    *   Hard-code safety limits (e.g., maximum joint velocities, force limits).
+    *   Provide the LLM with "negative examples" or explicit instructions on what *not* to do.
+    *   Use techniques like **Reinforcement Learning from Human Feedback (RLHF)** to fine-tune the LLM to prioritize safety.
+
+By carefully designing these verification steps, we can harness the powerful cognitive abilities of LLMs while ensuring our humanoid robots operate safely and reliably in the real world.

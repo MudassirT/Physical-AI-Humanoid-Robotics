@@ -1,0 +1,293 @@
+---
+sidebar_position: 5
+---
+
+## Hands-On Exercises
+
+These hands-on exercises will guide you through implementing key components of a Vision-Language-Action (VLA) system. You will need a Python environment with `whisper` and access to an LLM API (like OpenAI's GPT-3.5/GPT-4) for these exercises. A simulated ROS 2 environment (e.g., Isaac Sim with a humanoid robot) will be beneficial for Exercise 2.
+
+### Exercise 1: Build a Voice-to-Action Demo using Whisper + ROS 2
+
+**Objective**: To create a basic pipeline that converts a spoken command into a simple ROS 2 action.
+
+**You will need**:
+*   Python 3 environment.
+*   `openai-whisper` library installed (`pip install -U openai-whisper`).
+*   An active ROS 2 installation.
+*   A simple ROS 2 action server (e.g., `SayHello` action with a `message` field).
+
+**Steps**:
+
+1.  **Create a ROS 2 Action Definition**:
+    *   Define a simple ROS 2 action, for example, `SayHello.action`.
+    *   `SayHello.action`:
+        ```
+        string message
+        ---
+        bool success
+        ---
+        float feedback_percentage
+        ```
+    *   Build your ROS 2 package to generate the action interfaces.
+
+2.  **Implement a `SayHello` Action Server**:
+    *   Write a Python ROS 2 node that implements the `SayHello` action server.
+    *   When it receives a goal (a `message`), it should print the message to the console, send `feedback_percentage`, and then return `success=True`.
+
+    ```python
+    # simple_action_server.py
+    import rclpy
+    from rclpy.node import Node
+    from rclpy.action import ActionServer, GoalHandle # Import GoalHandle
+    from example_interfaces.action import SayHello # Assuming example_interfaces for simplicity
+
+    class SimpleActionServer(Node):
+        def __init__(self):
+            super().__init__('simple_action_server')
+            self._action_server = ActionServer(
+                self,
+                SayHello,
+                'say_hello',
+                self.execute_callback
+            )
+            self.get_logger().info("SayHello Action Server started.")
+
+        def execute_callback(self, goal_handle: GoalHandle): # Type hint for clarity
+            self.get_logger().info(f"Received goal: {goal_handle.request.message}")
+            for i in range(1, 11): # Simulate progress
+                feedback = SayHello.Feedback()
+                feedback.feedback_percentage = float(i) * 10.0
+                goal_handle.publish_feedback(feedback)
+                self.get_logger().info(f"Feedback: {feedback.feedback_percentage}%")
+                rclpy.spin_once(self, timeout_sec=0.1)
+
+            goal_handle.succeed()
+            result = SayHello.Result()
+            result.success = True
+            self.get_logger().info("Goal succeeded!")
+            return result
+
+    def main(args=None):
+        rclpy.init(args=args)
+        action_server = SimpleActionServer()
+        rclpy.spin(action_server)
+        rclpy.shutdown()
+
+    if __name__ == '__main__':
+        main()
+    ```
+
+3.  **Implement the Voice-to-Action Client**:
+    *   Write a Python script that:
+        *   Records a short audio clip (you can use `sounddevice` or `pyaudio` for this, or simply use a pre-recorded `.wav` file).
+        *   Uses OpenAI Whisper to transcribe the audio.
+        *   Uses a simple rule-based approach (or an LLM if you have API access) to extract the message for the `SayHello` action. For example, if the transcription contains "hello robot", extract "hello robot".
+        *   Creates a ROS 2 action client for `SayHello` and sends the extracted message as a goal.
+
+    ```python
+    # voice_action_client.py
+    import rclpy
+    from rclpy.node import Node
+    from rclpy.action import ActionClient
+    from example_interfaces.action import SayHello
+    import whisper # Ensure you have whisper installed
+
+    # Function to simulate audio recording and transcription (replace with actual recording)
+    def get_voice_command_text():
+        # This would typically involve capturing microphone input
+        # For demo, let's use a hardcoded text or pre-recorded audio
+        print("Please say a command (e.g., 'hello robot')...")
+        # In a real scenario, you'd record audio and pass to whisper.transcribe
+        # Example:
+        # audio_file = "path/to/your/recorded_audio.wav"
+        # model = whisper.load_model("base")
+        # result = model.transcribe(audio_file)
+        # return result["text"]
+        return "hello robot" # Placeholder
+
+    class VoiceActionClient(Node):
+        def __init__(self):
+            super().__init__('voice_action_client')
+            self._action_client = ActionClient(self, SayHello, 'say_hello')
+            self.get_logger().info("VoiceActionClient created.")
+
+        def send_goal(self, message):
+            self.get_logger().info("Waiting for action server...")
+            self._action_client.wait_for_server()
+
+            goal_msg = SayHello.Goal()
+            goal_msg.message = message
+
+            self.get_logger().info(f"Sending goal: {message}")
+            self._send_goal_future = self._action_client.send_goal_async(goal_msg, feedback_callback=self.feedback_callback)
+            self._send_goal_future.add_done_callback(self.goal_response_callback)
+
+        def goal_response_callback(self, future):
+            goal_handle = future.result()
+            if not goal_handle.accepted:
+                self.get_logger().info('Goal rejected :(')
+                return
+
+            self.get_logger().info('Goal accepted :)')
+            self._get_result_future = goal_handle.get_result_async()
+            self._get_result_future.add_done_callback(self.get_result_callback)
+
+        def get_result_callback(self, future):
+            result = future.result().result
+            self.get_logger().info(f'Result: {result.success}')
+            rclpy.shutdown()
+
+        def feedback_callback(self, feedback_msg):
+            feedback = feedback_msg.feedback
+            self.get_logger().info(f'Received feedback: {feedback.feedback_percentage}%')
+
+    def main(args=None):
+        rclpy.init(args=args)
+        client = VoiceActionClient()
+        text_command = get_voice_command_text()
+        client.send_goal(text_command)
+        rclpy.spin(client)
+
+    if __name__ == '__main__':
+        main()
+    ```
+
+4.  **Run the Demo**:
+    *   In one terminal, run the ROS 2 action server: `ros2 run <your_package> simple_action_server`.
+    *   In another terminal, run the client: `python voice_action_client.py`.
+    *   Observe the action server receiving and processing the command.
+
+**Success Criteria**: A spoken command (or hardcoded text) is transcribed and successfully triggers the ROS 2 action server, printing the message and feedback.
+
+---
+
+### Exercise 2: LLM-Based Task Planner Controlling a Simulated Humanoid
+
+**Objective**: To use an LLM to generate a sequence of actions for a simulated humanoid robot based on a natural language command.
+
+**You will need**:
+*   Access to an LLM API (e.g., OpenAI API key).
+*   A simulated humanoid robot in an environment with known objects (e.g., in Isaac Sim from Module 3).
+*   A ROS 2 setup with action servers for navigation, grasping, and placing.
+
+**Steps**:
+
+1.  **Set Up Robot Action Servers**:
+    *   Ensure your simulated humanoid has ROS 2 action servers for fundamental capabilities like:
+        *   `navigate_to_pose` (from Nav2 or a custom controller)
+        *   `grasp_object`
+        *   `place_object`
+        *   `find_object` (could integrate with Isaac ROS perception)
+    *   Each action server should define its own `.action` file and implement its logic.
+
+2.  **Develop an LLM Orchestrator Node**:
+    *   Write a Python ROS 2 node that acts as the central orchestrator.
+    *   This node will:
+        *   Receive a high-level natural language command (e.g., from a web interface, or by transcribing with Whisper).
+        *   Send this command as a prompt to the LLM API. The prompt should instruct the LLM to output a JSON-formatted action graph, similar to the "Clean the room" example in Section 4.2.
+        *   Parse the LLM's JSON response to get the sequence of actions.
+        *   For each action in the sequence, create the appropriate ROS 2 action goal and send it to the relevant action client.
+        *   Monitor the execution of each action and handle success or failure before proceeding to the next.
+
+    ```python
+    # llm_orchestrator.py (conceptual)
+    import rclpy
+    from rclpy.node import Node
+    from rclpy.action import ActionClient
+    # Import your custom action interfaces
+    from your_robot_interfaces.action import NavigateToPose, GraspObject, PlaceObject # etc.
+    import openai # pip install openai
+    import json
+
+    class LLMOrchestrator(Node):
+        def __init__(self):
+            super().__init__('llm_orchestrator')
+            self.openai_client = openai.OpenAI(api_key="YOUR_OPENAI_API_KEY")
+            # Action Clients for each robot capability
+            self.nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+            self.grasp_client = ActionClient(self, GraspObject, 'grasp_object')
+            self.place_client = ActionClient(self, PlaceObject, 'place_object')
+            # ... other clients
+
+            self.get_logger().info("LLM Orchestrator ready.")
+
+        async def get_llm_plan(self, command):
+            prompt = f"""
+            You are a robot task planner. Given a high-level command,
+            generate a sequence of robot actions in JSON format.
+            Each action should have an 'action' type and 'parameters'.
+            Available actions: 'navigate_to_pose', 'grasp_object', 'place_object'.
+            Example: {json.dumps({"actions": [{"action": "navigate_to_pose", "parameters": {"x": 1.0, "y": 2.0}}, {"action": "grasp_object", "parameters": {"object_id": "cup_01"}}]})}
+
+            Command: "{command}"
+            """
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-3.5-turbo", # or gpt-4
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                plan_str = response.choices[0].message.content
+                return json.loads(plan_str)
+            except Exception as e:
+                self.get_logger().error(f"Error getting plan from LLM: {e}")
+                return None
+
+        async def execute_plan(self, llm_plan):
+            if not llm_plan or "actions" not in llm_plan:
+                self.get_logger().error("Invalid LLM plan received.")
+                return False
+
+            for action_step in llm_plan["actions"]:
+                action_type = action_step["action"]
+                parameters = action_step.get("parameters", {})
+                self.get_logger().info(f"Executing: {action_type} with {parameters}")
+
+                if action_type == "navigate_to_pose":
+                    goal = NavigateToPose.Goal()
+                    goal.pose.position.x = parameters.get("x", 0.0)
+                    goal.pose.position.y = parameters.get("y", 0.0)
+                    # ... populate other pose fields
+                    await self.nav_client.wait_for_server()
+                    future = self.nav_client.send_goal_async(goal)
+                    result = await future.result().get_result_async()
+                    if not result.result.success:
+                        self.get_logger().error(f"Navigation failed!")
+                        return False
+                elif action_type == "grasp_object":
+                    goal = GraspObject.Goal()
+                    goal.object_id = parameters.get("object_id", "")
+                    await self.grasp_client.wait_for_server()
+                    future = self.grasp_client.send_goal_async(goal)
+                    result = await future.result().get_result_async()
+                    if not result.result.success:
+                        self.get_logger().error(f"Grasp failed for {goal.object_id}!")
+                        return False
+                # ... handle other action types
+            return True
+
+    def main(args=None):
+        rclpy.init(args=args)
+        orchestrator = LLMOrchestrator()
+        # Example command - in a real system, this could come from Whisper
+        command = "Go to the charging station and pick up the power pack."
+        
+        # Use asyncio to run the async methods
+        import asyncio
+        asyncio.run(orchestrator.execute_plan(asyncio.run(orchestrator.get_llm_plan(command))))
+
+        orchestrator.destroy_node()
+        rclpy.shutdown()
+
+    if __name__ == '__main__':
+        main()
+    ```
+
+3.  **Run the Simulation**:
+    *   Launch your simulated humanoid in Isaac Sim (or Gazebo).
+    *   Ensure all necessary ROS 2 action servers (navigation, grasping, etc.) are running.
+    *   Run your `llm_orchestrator.py` node.
+    *   Observe the simulated robot executing the sequence of actions planned by the LLM.
+
+**Success Criteria**: A high-level natural language command is processed by the LLM, converted into a series of ROS 2 action calls, and the simulated humanoid robot successfully performs the corresponding actions in the virtual environment.
+
+These exercises provide a strong foundation for building sophisticated VLA capabilities, pushing your humanoid robot towards truly intelligent and autonomous operation.
