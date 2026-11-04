@@ -1,0 +1,112 @@
+---
+sidebar_position: 8
+---
+
+# Parameters 
+
+**Parameters** in ROS 2 allow nodes to expose configuration values that can be set at startup or changed dynamically at runtime. This provides a flexible way to tune the behavior of a node without needing to recompile its code.
+
+## Key Characteristics of Parameters
+
+*   **Dynamic Configuration:** Parameters can be modified while a node is running, enabling real-time adjustments to a robot's behavior.
+*   **Persistent Storage:** Parameters can be loaded from configuration files (e.g., YAML files) at node startup.
+*   **Types:** Parameters support various data types, including booleans, integers, floating-point numbers, strings, and arrays of these types.
+*   **Description and Constraints:** Developers can provide descriptions and range constraints for parameters, improving their usability and preventing invalid values.
+
+## Creating and Using Parameters (Python Example)
+
+Let's modify our `talker_publisher` node to use a parameter for its publishing frequency and another for the message prefix.
+
+### Update `talker_publisher.py`
+
+Modify `~/ros2_ws/src/my_python_pkg/my_python_pkg/talker_publisher.py` to include parameter declarations and usage:
+
+```python
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import String
+
+class TalkerPublisher(Node):
+    def __init__(self):
+        super().__init__('talker_publisher')
+        
+        # Declare parameters
+        self.declare_parameter('frequency', 1.0) # Default frequency: 1.0 Hz
+        self.declare_parameter('message_prefix', 'Hello ROS 2') # Default prefix
+
+        # Get parameter values
+        frequency = self.get_parameter('frequency').value
+        self.message_prefix = self.get_parameter('message_prefix').value
+
+        self.publisher_ = self.create_publisher(String, 'chatter', 10)
+        self.timer = self.create_timer(1.0 / frequency, self.timer_callback) # Use parameter for timer
+        self.i = 0
+        self.get_logger().info(f'Talker Publisher Node started with frequency: {frequency} Hz, prefix: "{self.message_prefix}"')
+
+    def timer_callback(self):
+        msg = String()
+        msg.data = f'{self.message_prefix}: {self.i}' # Use parameter for message data
+        self.publisher_.publish(msg)
+        self.get_logger().info(f'Publishing: "{msg.data}"')
+        self.i += 1
+
+def main(args=None):
+    rclpy.init(args=args)
+    talker_publisher = TalkerPublisher()
+    rclpy.spin(talker_publisher)
+    talker_publisher.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Building and Running with Parameters
+
+1.  **Build the workspace:**
+    ```bash
+    cd ~/ros2_ws
+    colcon build --packages-select my_python_pkg
+    source install/setup.bash
+    ```
+2.  **Run the node with default parameters:**
+    ```bash
+    ros2 run my_python_pkg talker_publisher
+    ```
+    (You should see messages with "Hello ROS 2" every second)
+
+3.  **Run the node with custom parameters:**
+    ```bash
+    ros2 run my_python_pkg talker_publisher --ros-args -p frequency:=2.0 -p message_prefix:="Custom Message"
+    ```
+    (Now messages should appear every 0.5 seconds with "Custom Message")
+
+## Dynamic Parameter Updates
+
+While the node is running, you can change parameters using command-line tools.
+Open a new terminal, source your setup files, and then:
+
+*   **List parameters of a running node:**
+    ```bash
+    ros2 param list /talker_publisher
+    ```
+*   **Get a parameter value:**
+    ```bash
+    ros2 param get /talker_publisher frequency
+    ```
+*   **Set a parameter value:**
+    ```bash
+    ros2 param set /talker_publisher frequency 0.5
+    ```
+    You will observe the `talker_publisher` node's publishing rate change dynamically.
+    (Note: For the frequency change to take effect immediately, the timer in the `__init__` needs to be re-created or adjusted dynamically. The example above only reads the parameter once at startup. For true dynamic updates, the timer's period would need to be checked in `timer_callback` or a parameter event callback).
+
+## `ros2 param` Commands
+
+*   **`ros2 param list <node_name>`:** Lists parameters for a specific node.
+*   **`ros2 param get <node_name> <parameter_name>`:** Retrieves the value of a parameter.
+*   **`ros2 param set <node_name> <parameter_name> <value>`:** Sets the value of a parameter.
+*   **`ros2 param dump <node_name>`:** Dumps all parameters of a node to a YAML file.
+*   **`ros2 run <package_name> <executable_name> --ros-args --params-file <path_to_yaml_file>`:** Loads parameters from a YAML file at startup.
+
+Parameters are a powerful mechanism for making ROS 2 applications more configurable and adaptable to different scenarios without code changes.

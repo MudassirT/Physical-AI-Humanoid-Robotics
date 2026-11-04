@@ -1,0 +1,96 @@
+---
+sidebar_position: 4
+---
+
+# Nodes 
+
+As introduced earlier, **nodes** are the fundamental executable units in a ROS 2 system. Each node is designed to perform a specific task, promoting modularity and reusability of code.
+
+## The Purpose of Nodes
+
+Nodes encapsulate logic that performs a particular function, such as:
+*   **Sensor Drivers:** Reading data from a camera, LIDAR, or IMU.
+*   **Actuator Controllers:** Sending commands to motors, grippers, or robotic arms.
+*   **Data Processing:** Filtering sensor data, performing object detection, or mapping an environment.
+*   **Decision Making:** Implementing navigation algorithms, task planners, or AI models.
+*   **User Interfaces:** Providing visualization tools or control panels.
+
+## Node Lifecycle
+
+ROS 2 nodes can have a lifecycle, especially managed nodes, which allows for more robust state management. A typical lifecycle includes states like `unconfigured`, `inactive`, `active`, and `finalized`, with transitions between them (e.g., `configure`, `activate`, `deactivate`, `cleanup`). This provides a structured way to initialize, run, and shut down nodes, particularly useful for mission-critical applications.
+
+## Creating a Node (Python Example)
+
+Let's look at a simple Python node that prints "Hello ROS 2!" periodically.
+
+First, create a new Python package (if you haven't already):
+```bash
+cd ~/ros2_ws/src
+ros2 pkg create --build-type ament_python my_python_pkg
+```
+
+Now, inside `~/ros2_ws/src/my_python_pkg/my_python_pkg`, create a file named `talker_node.py`:
+
+```python
+import rclpy
+from rclpy.node import Node
+
+class TalkerNode(Node):
+    def __init__(self):
+        super().__init__('talker_node')
+        self.timer = self.create_timer(1.0, self.timer_callback)
+        self.get_logger().info('Hello ROS 2 from TalkerNode!')
+
+    def timer_callback(self):
+        self.get_logger().info('Still talking...')
+
+def main(args=None):
+    rclpy.init(args=args)
+    talker_node = TalkerNode()
+    rclpy.spin(talker_node) # Keeps the node alive until Ctrl+C is pressed
+    talker_node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+Make the script executable:
+```bash
+chmod +x ~/ros2_ws/src/my_python_pkg/my_python_pkg/talker_node.py
+```
+
+Then, you need to tell ROS 2 how to find and run this executable. Open `~/ros2_ws/src/my_python_pkg/setup.py` and add the following inside the `entry_points` dictionary:
+
+```python
+    entry_points={
+        'console_scripts': [
+            'talker = my_python_pkg.talker_node:main',
+        ],
+    },
+```
+
+## Building and Running a Node
+
+1.  **Build the workspace:**
+    ```bash
+    cd ~/ros2_ws
+    colcon build --packages-select my_python_pkg
+    ```
+2.  **Source the setup files:**
+    ```bash
+    source install/setup.bash
+    ```
+3.  **Run the node:**
+    ```bash
+    ros2 run my_python_pkg talker
+    ```
+    You should see "Hello ROS 2 from TalkerNode!" followed by "Still talking..." every second.
+
+## `ros2 run` and `ros2 node` Commands
+
+*   **`ros2 run <package_name> <executable_name>`:** Used to start an executable defined within a ROS 2 package.
+*   **`ros2 node list`:** Lists all active nodes in the ROS 2 graph.
+*   **`ros2 node info <node_name>`:** Provides detailed information about a specific node, including its published topics, subscribed topics, services, actions, and parameters.
+
+Nodes are the backbone of any ROS 2 application, allowing for the decomposition of complex robotic systems into manageable, interacting components.

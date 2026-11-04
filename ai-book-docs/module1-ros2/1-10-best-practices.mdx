@@ -1,0 +1,51 @@
+---
+sidebar_position: 10
+---
+
+# Best Practices in ROS 2 Development
+
+Developing robust and maintainable robotic applications with ROS 2 involves adopting certain best practices. These guidelines help ensure your code is efficient, scalable, and easy for others (and your future self) to understand and extend.
+
+## 1. Modular Design with Nodes
+
+*   **Single Responsibility Principle:** Each node should have a single, well-defined responsibility. This makes nodes easier to test, debug, and reuse.
+*   **Encapsulation:** Keep node-specific logic and data private to the node. Communicate with other nodes only through ROS 2 interfaces (topics, services, actions, parameters).
+
+## 2. Clear Communication Interfaces
+
+*   **Descriptive Naming:** Use clear and descriptive names for topics, services, actions, and parameters. Avoid generic names like `/data` or `/command`.
+*   **Standard Message Types:** Prefer using standard ROS 2 message types (`std_msgs`, `sensor_msgs`, `geometry_msgs`, etc.) whenever possible. This increases compatibility and reusability.
+*   **Custom Message Types:** If standard messages don't fit, create custom `.msg`, `.srv`, or `.action` files. Keep them minimal and well-documented.
+
+## 3. Quality of Service (QoS) Settings
+
+*   **Understand QoS:** ROS 2's DDS layer offers powerful QoS settings (reliability, durability, history, liveliness). Understand their impact on your communication.
+*   **Explicitly Set QoS:** Don't rely solely on default QoS profiles. Explicitly configure QoS for publishers and subscribers to match your application's requirements (e.g., `reliable` for commands, `best effort` for high-frequency sensor data).
+
+## 4. Parameterization
+
+*   **Externalize Configuration:** Use parameters for all configurable values in your nodes. Avoid hardcoding values that might change between deployments or experimental setups.
+*   **Runtime Adjustments:** Leverage the dynamic nature of parameters to tune node behavior without recompilation or restarting.
+
+## 5. Launch Files
+
+*   **Automate Startup:** Use ROS 2 launch files (Python or XML) to start multiple nodes, set parameters, and remap topics/services. This simplifies the deployment and testing of complex systems.
+*   **Organize Launch Files:** Group related nodes into logical launch files. Use includes to compose larger launch configurations.
+
+## 6. Logging and Debugging
+
+*   **Meaningful Logs:** Use `rclpy.logging` or `rclcpp::Logger` for logging. Provide informative log messages at appropriate levels (DEBUG, INFO, WARN, ERROR, FATAL).
+*   **Debugging Tools:** Familiarize yourself with ROS 2 debugging tools like `rqt_graph` (for visualizing the graph), `ros2 topic echo/info`, `ros2 node info`, `ros2 param list/get/set`, and `rviz2` (for 3D visualization).
+
+## 7. Version Control and Documentation
+
+*   **Use Git:** Always manage your ROS 2 code in a version control system like Git.
+*   **Document Everything:** Document your packages, nodes, message types, services, and actions. Use `package.xml` for package metadata and add READMEs to explain complex components.
+*   **Code Comments:** Add comments to explain non-obvious code sections, design choices, or potential pitfalls.
+
+## 8. Testing
+
+*   **Unit Tests:** Write unit tests for individual functions and classes within your nodes.
+*   **Integration Tests:** Create integration tests to verify the interactions between multiple nodes and the overall system behavior.
+
+By adhering to these best practices, you can develop more robust, maintainable, and scalable robotic applications within the ROS 2 ecosystem. This lays a strong foundation for integrating advanced AI capabilities.

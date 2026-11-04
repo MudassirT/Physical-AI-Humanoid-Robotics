@@ -1,0 +1,222 @@
+---
+sidebar_position: 7
+---
+
+# Actions 
+
+**Actions** in ROS 2 provide a high-level, asynchronous communication mechanism for long-running goals that require periodic feedback. They are built on top of topics and services and are particularly useful for tasks like navigating a robot to a goal, performing a complex manipulation sequence, or executing a pick-and-place operation.
+
+An Action involves:
+*   **Goal:** The desired state or task to be achieved.
+*   **Feedback:** Periodic updates on the progress of the action.
+*   **Result:** The final outcome of the action once it's complete.
+
+## Goal/Feedback/Result Model
+
+*   **Action Server:** A node that receives action goals, executes the task, publishes feedback as the task progresses, and finally sends the result.
+*   **Action Client:** A node that sends an action goal to an action server, monitors the feedback, and processes the final result.
+*   **Action Name:** A unique string identifier for the action (e.g., `/navigate_to_pose`, `/gripper_control`).
+*   **Action Definition:** Defined by `.action` files, which explicitly define the structure of the goal, feedback, and result messages. The syntax is similar to services, but with three sections separated by `---`.
+
+## Creating an Action (Python Example)
+
+Let's create a simple action for a "Countdown" task.
+
+### Define the Action (`Countdown.action`)
+
+First, create an `action` directory inside `~/ros2_ws/src/my_python_pkg` (if it doesn't exist) and then `Countdown.action`:
+
+```
+int32 target_number
+---
+int32 final_count
+---
+int32 current_count
+```
+
+### Update `package.xml`
+
+Similar to services, you need to declare that your package exports an action. Add these lines to `~/ros2_ws/src/my_python_pkg/package.xml`:
+
+```xml
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+```
+
+### Update `setup.py`
+
+You also need to tell `setup.py` to process the `.action` files.
+Modify the `data_files` section in `~/ros2_ws/src/my_python_pkg/setup.py`:
+
+```python
+from setuptools import find_packages, setup
+import os
+from glob import glob
+
+package_name = 'my_python_pkg'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/srv', glob('srv/*.srv')),
+        ('share/' + package_name + '/action', glob('action/*.action')), # Add this line
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yeml]*'))),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='your_name',
+    maintainer_email='your_email@example.com',
+    description='TODO: Package description',
+    license='TODO: License declaration',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'talker = my_python_pkg.talker_node:main',
+            'talker_publisher = my_python_pkg.talker_publisher:main',
+            'listener_subscriber = my_python_pkg.listener_subscriber:main',
+            'add_two_ints_server = my_python_pkg.add_two_ints_server:main',
+            'add_two_ints_client = my_python_pkg.add_two_ints_client:main',
+            'countdown_action_server = my_python_pkg.countdown_action_server:main',
+            'countdown_action_client = my_python_pkg.countdown_action_client:main',
+        ],
+    },
+)
+```
+
+### Action Server (`countdown_action_server.py`)
+
+Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/countdown_action_server.py`:
+
+```python
+import time
+import rclpy
+from rclpy.action import ActionServer
+from rclpy.node import Node
+from my_python_pkg.action import Countdown # Import your action type
+
+class CountdownActionServer(Node):
+    def __init__(self):
+        super().__init__('countdown_action_server')
+        self._action_server = ActionServer(
+            self,
+            Countdown,
+            'countdown',
+            self.execute_callback)
+        self.get_logger().info('Countdown Action Server ready.')
+
+    async def execute_callback(self, goal_handle):
+        self.get_logger().info('Executing goal...')
+        feedback_msg = Countdown.Feedback()
+        for i in range(goal_handle.request.target_number, 0, -1):
+            feedback_msg.current_count = i
+            self.get_logger().info(f'Feedback: {i}')
+            goal_handle.publish_feedback(feedback_msg)
+            time.sleep(1)
+
+        goal_handle.succeed()
+        result = Countdown.Result()
+        result.final_count = 0 # Counted down to 0
+        self.get_logger().info('Goal succeeded!')
+        return result
+
+def main(args=None):
+    rclpy.init(args=args)
+    countdown_action_server = CountdownActionServer()
+    rclpy.spin(countdown_action_server)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+### Action Client (`countdown_action_client.py`)
+
+Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/countdown_action_client.py`:
+
+```python
+import rclpy
+from rclpy.action import ActionClient
+from rclpy.node import Node
+from my_python_pkg.action import Countdown # Import your action type
+
+class CountdownActionClient(Node):
+    def __init__(self):
+        super().__init__('countdown_action_client')
+        self._action_client = ActionClient(self, Countdown, 'countdown')
+        self.get_logger().info('Countdown Action Client ready.')
+
+    def send_goal(self, target_number):
+        self.get_logger().info('Waiting for action server...')
+        self._action_client.wait_for_server()
+
+        goal_msg = Countdown.Goal()
+        goal_msg.target_number = target_number
+
+        self.get_logger().info('Sending goal request...')
+        self._send_goal_future = self._action_client.send_goal_async(
+            goal_msg,
+            feedback_callback=self.feedback_callback)
+
+        self._send_goal_future.add_done_callback(self.goal_response_callback)
+
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+        if not goal_handle.accepted:
+            self.get_logger().info('Goal rejected :(')
+            return
+
+        self.get_logger().info('Goal accepted :)')
+        self._get_result_future = goal_handle.get_result_async()
+        self._get_result_future.add_done_callback(self.get_result_callback)
+
+    def get_result_callback(self, future):
+        result = future.result().result
+        self.get_logger().info(f'Result: Final count {result.final_count}')
+        rclpy.shutdown()
+
+    def feedback_callback(self, feedback_msg):
+        self.get_logger().info(f'Received feedback: {feedback_msg.feedback.current_count}')
+
+def main(args=None):
+    rclpy.init(args=args)
+    action_client = CountdownActionClient()
+    action_client.send_goal(5) # Example: countdown from 5
+    rclpy.spin(action_client)
+    #rclpy.shutdown() # Shutdown handled in get_result_callback for this example
+
+if __name__ == '__main__':
+    main()
+```
+
+## Building and Running
+
+1.  **Build the workspace (including new action definition):**
+    ```bash
+    cd ~/ros2_ws
+    colcon build --packages-select my_python_pkg
+    source install/setup.bash
+    ```
+2.  **Run the action server in one terminal:**
+    ```bash
+    ros2 run my_python_pkg countdown_action_server
+    ```
+3.  **Run the action client in another terminal:**
+    ```bash
+    ros2 run my_python_pkg countdown_action_client
+    ```
+    You should see the client sending a goal, the server executing it with feedback, and finally sending a result.
+
+## `ros2 action` Commands
+
+*   **`ros2 action list`:** Lists all active actions.
+*   **`ros2 action info <action_name>`:** Displays information about an action, including clients and servers.
+*   **`ros2 action send_goal <action_name> <action_type> <goal_json>`:** Sends a goal to an action server from the command line.
+
+Actions provide a robust way to handle complex, long-running tasks in a robotic system, giving clients better control and visibility over the task's progress.

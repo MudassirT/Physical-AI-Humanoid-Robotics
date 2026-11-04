@@ -1,0 +1,189 @@
+---
+sidebar_position: 6
+---
+
+# Services
+
+**Services** in ROS 2 provide a synchronous request/reply communication model. Unlike topics, which are designed for continuous, asynchronous data streaming, services are used when you need to send a request to a node and receive a single, immediate response. This is analogous to a function call in a traditional programming paradigm.
+
+## Request/Reply Model
+
+*   **Service Server:** A node that "advertises" a service and waits for incoming requests. When a request is received, the server executes a defined callback function to process the request and generate a response.
+*   **Service Client:** A node that "calls" a service on a server, sending a request message and blocking (or awaiting asynchronously) until it receives a response message.
+*   **Service Name:** A unique string identifier for the service (e.g., `/get_robot_pose`, `/set_gripper_state`).
+*   **Service Definition:** Defined by `.srv` files, which explicitly define the structure of both the request and response messages. A `---` separates the request fields from the response fields.
+
+## Creating a Service (Python Example)
+
+Let's create a simple service that adds two integers.
+
+### Define the Service (`AddTwoInts.srv`)
+
+First, create a `srv` directory inside `~/ros2_ws/src/my_python_pkg` (if it doesn't exist) and then `AddTwoInts.srv`:
+
+```
+int64 a
+int64 b
+---
+int64 sum
+```
+
+### Update `package.xml`
+
+You need to declare that your package exports a service. Add these lines to `~/ros2_ws/src/my_python_pkg/package.xml`:
+
+```xml
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <build_depend>rosidl_default_generators</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+```
+
+Also, ensure you have `std_msgs` or any other message dependencies in your `package.xml`. For custom services, you need `rosidl_default_generators` for building and `rosidl_default_runtime` for execution.
+
+### Update `setup.py`
+
+You also need to tell `setup.py` to process the `.srv` files.
+Add the following to `~/ros2_ws/src/my_python_pkg/setup.py`:
+
+```python
+from setuptools import find_packages, setup
+import os
+from glob import glob
+
+package_name = 'my_python_pkg'
+
+setup(
+    name=package_name,
+    version='0.0.0',
+    packages=find_packages(exclude=['test']),
+    data_files=[
+        ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/srv', glob('srv/*.srv')), # Add this line
+        ('share/ament_index/resource_index/packages',
+            ['resource/' + package_name]),
+        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yeml]*'))),
+    ],
+    install_requires=['setuptools'],
+    zip_safe=True,
+    maintainer='your_name',
+    maintainer_email='your_email@example.com',
+    description='TODO: Package description',
+    license='TODO: License declaration',
+    tests_require=['pytest'],
+    entry_points={
+        'console_scripts': [
+            'talker = my_python_pkg.talker_node:main',
+            'talker_publisher = my_python_pkg.talker_publisher:main',
+            'listener_subscriber = my_python_pkg.listener_subscriber:main',
+            'add_two_ints_server = my_python_pkg.add_two_ints_server:main',
+            'add_two_ints_client = my_python_pkg.add_two_ints_client:main',
+        ],
+    },
+)
+```
+
+### Service Server (`add_two_ints_server.py`)
+
+Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/add_two_ints_server.py`:
+
+```python
+import rclpy
+from rclpy.node import Node
+from my_python_pkg.srv import AddTwoInts # Import your service type
+
+class AddTwoIntsServer(Node):
+    def __init__(self):
+        super().__init__('add_two_ints_server')
+        self.srv = self.create_service(AddTwoInts, 'add_two_ints', self.add_two_ints_callback)
+        self.get_logger().info('Add two ints service ready.')
+
+    def add_two_ints_callback(self, request, response):
+        response.sum = request.a + request.b
+        self.get_logger().info(f'Incoming request: a={request.a}, b={request.b}')
+        self.get_logger().info(f'Sending response: sum={response.sum}')
+        return response
+
+def main(args=None):
+    rclpy.init(args=args)
+    add_two_ints_server = AddTwoIntsServer()
+    rclpy.spin(add_two_ints_server)
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+### Service Client (`add_two_ints_client.py`)
+
+Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/add_two_ints_client.py`:
+
+```python
+import sys
+import rclpy
+from rclpy.node import Node
+from my_python_pkg.srv import AddTwoInts # Import your service type
+
+class AddTwoIntsClient(Node):
+    def __init__(self):
+        super().__init__('add_two_ints_client')
+        self.cli = self.create_client(AddTwoInts, 'add_two_ints')
+        while not self.cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Service not available, waiting again...')
+        self.req = AddTwoInts.Request()
+
+    def send_request(self, a, b):
+        self.req.a = a
+        self.req.b = b
+        self.future = self.cli.call_async(self.req)
+        rclpy.spin_until_future_complete(self, self.future)
+        return self.future.result()
+
+def main(args=None):
+    rclpy.init(args=args)
+    add_two_ints_client = AddTwoIntsClient()
+    if len(sys.argv) != 3:
+        add_two_ints_client.get_logger().info('Usage: ros2 run my_python_pkg add_two_ints_client <arg1> <arg2>')
+        sys.exit(1)
+    
+    a = int(sys.argv[1])
+    b = int(sys.argv[2])
+    response = add_two_ints_client.send_request(a, b)
+    if response:
+        add_two_ints_client.get_logger().info(f'Result of add_two_ints: {a} + {b} = {response.sum}')
+    else:
+        add_two_ints_client.get_logger().info('Service call failed.')
+    
+    add_two_ints_client.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
+```
+
+## Building and Running
+
+1.  **Build the workspace (including new service definition):**
+    ```bash
+    cd ~/ros2_ws
+    colcon build --packages-select my_python_pkg
+    source install/setup.bash
+    ```
+2.  **Run the service server in one terminal:**
+    ```bash
+    ros2 run my_python_pkg add_two_ints_server
+    ```
+3.  **Run the service client in another terminal:**
+    ```bash
+    ros2 run my_python_pkg add_two_ints_client 5 7
+    ```
+    The client should send the request, and the server should respond with `12`.
+
+## `ros2 service` Commands
+
+*   **`ros2 service list`:** Lists all active services.
+*   **`ros2 service type <service_name>`:** Displays the service type.
+*   **`ros2 service find <service_type>`:** Finds all services of a given type.
+*   **`ros2 service call <service_name> <service_type> <args>`:** Calls a service from the command line.
+
+Services are essential for specific, on-demand interactions between nodes, complementing the continuous data flow provided by topics.
