@@ -1,0 +1,131 @@
+---
+sidebar_position: 5
+---
+
+## Hands-On Exercises
+
+Theory is important, but robotics is a hands-on discipline. In this section, we will apply the concepts we've learned to build and interact with our digital twin. These exercises will require you to have ROS 2, Gazebo, and the `gazebo_ros_pkgs` installed.
+
+### Exercise 1: Spawn a Humanoid from URDF into Gazebo
+
+**Objective**: To understand the process of taking a robot description file and bringing the robot to life in the Gazebo simulator.
+
+**You will need**:
+*   A sample URDF file for a simple humanoid robot. For this exercise, you can use a pre-existing model like the `iRobot-Create-URDF` or a simple custom biped model. (A sample file `simple_biped.urdf` should be provided alongside this course material).
+*   A Gazebo world file. An empty world is sufficient.
+
+**Steps**:
+
+1.  **Create a Launch File**: In your ROS 2 package, create a Python launch file (e.g., `spawn_humanoid.launch.py`). This file will automate the process of starting Gazebo and spawning the robot.
+
+2.  **Include the Gazebo Executable**: Your launch file should first start the Gazebo server (`gzserver`) and client (`gzclient`). You can use the `ExecuteProcess` action from `launch.actions` to do this.
+
+    ```python
+    # Inside your launch file
+    gazebo = ExecuteProcess(
+        cmd=['gazebo', '--verbose', '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world_path],
+        output='screen'
+    )
+    ```
+
+3.  **Read the URDF File**: Your launch file needs to locate and read the contents of your `simple_biped.urdf` file.
+
+4.  **Define the Spawner Node**: The key to spawning the robot is the `spawn_entity.py` script provided by `gazebo_ros`. You will create a `Node` action in your launch file that runs this script.
+
+    ```python
+    # The spawner node
+    spawn_entity = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=[
+            '-topic', 'robot_description',
+            '-entity', 'simple_biped',
+            '-x', '0.0',
+            '-y', '0.0',
+            '-z', '1.0'
+        ],
+        output='screen'
+    )
+    ```
+    This node tells Gazebo to listen to the `/robot_description` topic for the robot's model and spawn an entity named `simple_biped` at a height of 1.0 meter.
+
+5.  **Publish the Robot Description**: You need a `robot_state_publisher` node that reads the URDF and publishes it to the `/robot_description` topic.
+
+6.  **Launch and Observe**: Run your launch file using `ros2 launch <your_package> spawn_humanoid.launch.py`. You should see Gazebo open, and after a moment, your humanoid model will appear and likely fall over due to gravity, demonstrating that the physics engine is active.
+
+**Success Criteria**: The humanoid robot model appears in the Gazebo window at the specified coordinates.
+
+---
+
+### Exercise 2: Simulate a Room with LiDAR + IMU
+
+**Objective**: To build a simple test environment and simulate sensor data that can be visualized in ROS 2.
+
+**Steps**:
+
+1.  **Create a World SDF File**: Create a new file named `test_room.world`. In this file, use SDF to define a ground plane and four simple walls to form a box.
+
+    ```xml
+    <!-- Abridged example for test_room.world -->
+    <sdf version='1.7'>
+      <world name='default'>
+        <include>
+          <uri>model://ground_plane</uri>
+        </include>
+        <model name='walls'>
+          <!-- Define walls using <link> and <collision>/<visual> tags -->
+        </model>
+      </world>
+    </sdf>
+    ```
+
+2.  **Add Sensors to the URDF**: Modify your `simple_biped.urdf` file to include plugins for a LiDAR sensor and an IMU sensor. Attach them to relevant links, like the `head` or `torso`.
+
+    ```xml
+    <!-- Abridged example for URDF -->
+    <gazebo reference="torso_link">
+      <sensor name="imu_sensor" type="imu">
+        <plugin name="imu_plugin" filename="libgazebo_ros_imu_sensor.so">
+          <!-- ROS 2 parameters for topic name, frame, etc. -->
+        </plugin>
+      </sensor>
+    </gazebo>
+
+    <gazebo reference="head_link">
+      <sensor name="lidar" type="ray">
+        <plugin name="lidar_plugin" filename="libgazebo_ros_ray_sensor.so">
+          <!-- ROS 2 parameters for topic name, etc. -->
+        </plugin>
+        <!-- LiDAR-specific configuration for range, samples, etc. -->
+      </sensor>
+    </gazebo>
+    ```
+
+3.  **Update the Launch File**: Modify your launch file to load your new `test_room.world` instead of an empty world.
+
+4.  **Launch the Simulation**: Run your updated launch file. Your biped should now spawn inside the room you created.
+
+5.  **Visualize the Data**:
+    *   **LiDAR**: Open RViz2 (`ros2 run rviz2 rviz2`). Add a `LaserScan` display and set the topic to your LiDAR's topic (e.g., `/scan`). You should see red points indicating where the LiDAR beams are hitting the walls of your room.
+    *   **IMU**: In a new terminal, use `ros2 topic echo` to view the raw data from your IMU topic (e.g., `/imu/data`).
+
+**Success Criteria**: The robot spawns in the enclosed room, and you can successfully visualize the LiDAR data in RViz2 and echo the IMU data on the console.
+
+---
+
+### Bonus Exercise: Create a Unity Scene & Link to ROS 2
+
+**Objective**: To get a feel for the Unity side of the digital twin by creating a visual scene and preparing it for ROS 2 communication.
+
+**Steps**:
+
+1.  **Set up Unity Robotics Hub**: Create a new Unity project and import the official `Unity-Robotics-Hub` package.
+2.  **Create a Simple Scene**: In Unity, create a new scene. Add a "Plane" GameObject to act as the ground. Add a few "Cube" or "Sphere" GameObjects to act as simple props. Apply materials and colors to make the scene visually distinct.
+3.  **Import Robot Model**: Import the visual meshes (`.dae` or `.fbx` files) of your humanoid robot into Unity and assemble them into a prefab.
+4.  **Add ROS 2 Connection**: Add the `ROSConnection` prefab to your scene and configure it to connect to your ROS 2 network (you may need to run the `ros2-web-bridge`).
+5.  **Next Steps (Conceptual)**:
+    *   Think about how you would write a C# script to subscribe to the `/joint_states` topic.
+    *   This script would need a reference to each of the visual links of your robot model in Unity.
+    *   In the script's `Update` function, you would parse the `JointState` message and apply the received joint angles to the `transform.rotation` of each corresponding link.
+
+**Success Criteria**: You have a Unity scene that can successfully connect to your ROS 2 network. When you run the scene, the Unity console shows a "Connected to ROS" message.
