@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato&family=Montserrat:wght@700&family=Open+Sans&family=Poppins:wght@700&family=Roboto:wght@700&display=swap');
+
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+:root {
+  --ifm-color-primary: #00008B; /* Dark Blue */
+  --ifm-color-primary-dark: #00005C;
+  --ifm-color-primary-darker: #000041;
+  --ifm-color-primary-darkest: #000027;
+  --ifm-color-primary-light: #3333A3;
+  --ifm-color-primary-lighter: #4C4CB5;
+  --ifm-color-primary-lightest: #dce3f8; /* used by ChatWidget bubble */
+
+  --ifm-color-secondary: #0000FF; /* Blue */
+  --ifm-color-secondary-dark: #0000CC;
+  --ifm-color-secondary-darker: #0000A3;
+  --ifm-color-secondary-darkest: #00006B;
+  --ifm-color-secondary-light: #4747FF;
+  --ifm-color-secondary-lighter: #6B6BFF;
+  --ifm-color-secondary-lightest: #f0f4f8; /* used by ChatWidget agent bubble */
+
+  --ifm-background-color: #FFFFFF; /* White */
+  --ifm-background-surface-color: #F5F5F5; /* Light Grey */
+
+  --ifm-font-color-base: #000000;
+  --ifm-font-family-base: 'Open Sans', 'Lato', sans-serif;
+  --ifm-heading-font-family: 'Roboto', 'Poppins', 'Montserrat', sans-serif;
+
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+}
+
+.hero--primary {
+  background: linear-gradient(45deg, var(--ifm-color-primary), var(--ifm-color-primary-light));
+}
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: var(--ifm-heading-font-family);
+    font-weight: 700;
+}
+
+
+/* For readability concerns, you should choose a lighter palette in dark mode. */
+[data-theme='dark'] {
+  --ifm-color-primary: #ADD8E6; /* Light Cyan-ish */
+  --ifm-color-primary-dark: #9AC9D6;
+  --ifm-color-primary-darker: #8DC0CF;
+  --ifm-color-primary-darkest: #6CAEC3;
+  --ifm-color-primary-light: #BCE1F0;
+  --ifm-color-primary-lighter: #C6E6F2;
+  --ifm-color-primary-lightest: #1e2d3d; /* dark-mode ChatWidget user bubble */
+
+  --ifm-color-secondary: #A9A9A9; /* Dark Grey */
+  --ifm-color-secondary-dark: #949494;
+  --ifm-color-secondary-darker: #8A8A8A;
+  --ifm-color-secondary-darkest: #707070;
+  --ifm-color-secondary-light: #BDBDBD;
+  --ifm-color-secondary-lighter: #C8C8C8;
+  --ifm-color-secondary-lightest: #1e1e2e; /* dark-mode ChatWidget agent bubble */
+
+  --ifm-background-color: #121212;
+  --ifm-background-surface-color: #1E1E1E;
+
+  --ifm-font-color-base: #FFFFFF;
+
+  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+}
