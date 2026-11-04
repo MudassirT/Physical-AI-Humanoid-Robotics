@@ -1,0 +1,114 @@
+---
+sidebar_position: 5
+---
+
+## Hands-On Exercises
+
+Now it's time to put theory into practice. These exercises will guide you through using the NVIDIA Isaac platform to build and run an AI-powered brain for a humanoid robot. You will need a computer with an NVIDIA RTX GPU and a working installation of Isaac Sim and Isaac ROS.
+
+### Exercise 1: Build a Perception Pipeline using Isaac ROS
+
+**Objective**: To use Isaac Sim and Isaac ROS to perform real-time object detection on a simulated humanoid robot.
+
+**You will need**:
+*   A working Isaac Sim installation.
+*   A Docker container with the Isaac ROS development environment.
+*   A URDF file for a robot with a camera (e.g., the Carter robot provided in Isaac Sim examples).
+
+**Steps**:
+
+1.  **Launch Isaac Sim and Set up the Scene**:
+    *   Start Isaac Sim.
+    *   Open a pre-built warehouse environment (e.g., `Isaac/Environments/Simple_Warehouse/warehouse.usd`).
+    *   Add a robot to the scene (e.g., Carter) that has a camera attached.
+    *   Add a few primitive shapes (cubes, cylinders) or other objects in front of the robot for it to detect.
+
+2.  **Enable ROS 2 Bridge**:
+    *   In Isaac Sim, enable the ROS 2 bridge. This allows the simulator to publish sensor data (like camera images) to ROS 2 topics.
+    *   Make sure the camera is publishing its images to a topic like `/image_raw`.
+
+3.  **Configure and Launch Isaac ROS DetectNet Node**:
+    *   Inside your Isaac ROS Docker container, create a new ROS 2 launch file.
+    *   This launch file should start the `isaac_ros_detectnet` node.
+    *   You will need to configure the node to subscribe to the correct image topic from Isaac Sim.
+    *   You will also point it to a pre-trained object detection model. Isaac ROS provides several by default.
+
+    ```python
+    # Abridged example for detectnet.launch.py
+    from launch_ros.actions import ComposableNodeContainer
+    from launch_ros.descriptions import ComposableNode
+
+    # ...
+
+    detectnet_container = ComposableNodeContainer(
+        name='detectnet_container',
+        namespace='',
+        package='rclcpp_components',
+        executable='component_container',
+        composable_node_descriptions=[
+            ComposableNode(
+                package='isaac_ros_detectnet',
+                plugin='nvidia::isaac_ros::detectnet::DetectNetNode',
+                name='detectnet_node',
+                parameters=[{
+                    'model_path': '/path/to/your/model.etlt',
+                    # ... other parameters
+                }]
+            ),
+        ],
+        output='screen',
+    )
+    ```
+
+4.  **Run and Visualize**:
+    *   Run your simulation in Isaac Sim.
+    *   Launch your ROS 2 launch file from the Docker container.
+    *   In a new terminal (also in the container), launch `rqt_image_view`.
+    *   Subscribe to the `/detectnet/image` topic. You should see the camera feed from Isaac Sim with bounding boxes drawn around the objects you placed, with labels and confidence scores.
+
+**Success Criteria**: You can see the annotated video stream in `rqt_image_view`, with objects in the Isaac Sim environment correctly identified and boxed by the Isaac ROS pipeline.
+
+---
+
+### Exercise 2: Run Nav2 Navigation for a Humanoid in Simulation
+
+**Objective**: To configure and run the Nav2 stack to make a simulated humanoid robot navigate to a goal.
+
+**You will need**:
+*   The setup from Exercise 1.
+*   The Isaac ROS VSLAM and Nav2 packages.
+*   A bipedal robot model with a walking controller that accepts `cmd_vel` commands.
+
+**Steps**:
+
+1.  **Launch the SLAM Pipeline**:
+    *   In addition to the components from Exercise 1, your launch file should now also include the Isaac ROS VSLAM node.
+    *   Ensure your robot has a stereo camera and IMU, and that the VSLAM node is subscribed to their topics.
+
+2.  **Map the Environment**:
+    *   Launch the simulation and your perception launch file.
+    *   In a terminal, run `ros2 launch isaac_ros_nav2 nav2_localization.launch.py`.
+    *   Drive the robot around the warehouse environment manually (you can use a teleop script) until the VSLAM node has generated a good map of the area.
+    *   Save the map using the `ros2 run nav2_map_server map_saver_cli` command.
+
+3.  **Configure and Launch Nav2**:
+    *   Create a new launch file for Nav2. This is a complex but well-documented process. You will need to:
+        *   Point to the map you just saved.
+        *   Configure the global and local costmaps. Pay close attention to the `inflation_radius` to give your humanoid enough space.
+        *   Set the parameters for the global and local planners. Start with very low velocity and acceleration limits.
+        *   Provide an initial pose for the robot in the map.
+
+4.  **Set a Goal**:
+    *   Launch RViz, configured with the Nav2 plugin.
+    *   You should see the map, the robot's position, and the costmaps.
+    *   Use the "Nav2 Goal" tool in the RViz toolbar to click a destination point in the warehouse.
+
+5.  **Observe the Robot**:
+    *   When you set the goal, Nav2's global planner should generate a path (a green line).
+    *   The local planner will then start issuing `cmd_vel` commands.
+    *   Your robot's walking controller should subscribe to these `cmd_vel` commands and begin walking along the path.
+
+**Success Criteria**: The robot successfully navigates from its start position to the goal position you set in RViz, avoiding obstacles along the way.
+
+**Simulation-to-Real Example**:
+The `isaac_ros_detectnet` node you used in Exercise 1 is a perfect example of a sim-to-real component. The exact same node, without any changes to its code, can be deployed on a physical robot (like an NVIDIA Jetson-powered humanoid). As long as the physical robot has a camera publishing to the same topic name, the perception node will simply work, taking in real images instead of simulated ones. The key is that the model you are using was made robust through training on synthetic, domain-randomized data from Isaac Sim, enabling it to bridge the reality gap.

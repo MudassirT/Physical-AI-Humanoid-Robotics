@@ -1,0 +1,45 @@
+---
+sidebar_position: 4
+---
+
+## Nav2 for Bipedal Movement
+
+Once a robot can build a map and locate itself within it, the next logical step is to move from point A to point B. In ROS 2, the standard tool for this is the **Navigation Stack**, commonly known as **Nav2**. While Nav2 was primarily designed for wheeled robots, its modular architecture allows us to adapt it for more complex platforms like humanoids.
+
+### The Map → Plan → Control Pipeline
+
+Nav2 operates on a simple yet powerful pipeline:
+
+1.  **Map**: Nav2 takes in a map of the environment. This can be a pre-made map (from a building's floor plan) or, more commonly, a map generated in real-time by a SLAM system like the Isaac ROS VSLAM node. It also uses sensor data to build a **costmap** on top of this map, which we'll discuss shortly.
+
+2.  **Plan**: When you provide a goal pose (an `(x, y, θ)` coordinate) in RViz or through an action call, the **Global Planner** calculates a high-level path from the robot's current position to the goal. This planner operates on the global map and finds the optimal route, avoiding static obstacles.
+
+3.  **Control**: The global plan is then passed to the **Local Planner** (also known as the Controller). The local planner's job is to generate the immediate velocity commands (`cmd_vel` messages, typically `Twist` messages containing linear and angular velocities) required to follow the global plan while avoiding local, dynamic obstacles (like a person walking by).
+
+For a wheeled robot, this `cmd_vel` is straightforward: it tells the wheels how fast to turn. For a humanoid, it's more complex. A `cmd_vel` message might instruct the robot's walking pattern generator to "walk forward at 0.5 m/s and turn at 0.1 rad/s."
+
+### Adapting Nav2 for Humanoids
+
+The default planners and controllers in Nav2 are designed for robots that can move in any direction at any time (holonomic) or robots that move like a car (Ackermann steering). A walking humanoid is neither. It has a limited turning radius, acceleration constraints, and, most importantly, it can't stop on a dime or move sideways instantly.
+
+Adapting Nav2 requires careful tuning and, in some cases, custom plugins:
+
+*   **Global Planner**: A standard A* or Dijkstra-based global planner (like `navfn` or the Smac Planner) often works well, as the high-level path doesn't need to consider the robot's dynamics in detail.
+*   **Local Planner**: This is where the most adaptation is needed. The local planner must be aware of the humanoid's limitations. You might need to:
+    *   **Tune Parameters**: Aggressively lower the acceleration and velocity limits to match what the robot's walking gait can safely handle.
+    *   **Use a Custom Plugin**: For advanced performance, you might replace the default local planner with one specifically designed for legged robots, such as a TEB (Timed Elastic Band) or MPC (Model Predictive Control) planner with parameters and constraints tailored to bipedal locomotion.
+
+### Costmaps for Bipedal Walking
+
+Perhaps the most critical adaptation for a bipedal robot is the **costmap**. A costmap is a 2D grid that represents the "cost" of traversing any cell in the environment.
+*   A cell with a cost of 0 is free space.
+*   A cell with a cost of 255 is a lethal obstacle (the robot is forbidden to enter).
+*   Values in between represent areas that are traversable but should be avoided if possible (e.g., being too close to a wall).
+
+Nav2 uses two costmaps:
+1.  **Global Costmap**: Used by the global planner to find a path around known, static obstacles.
+2.  **Local Costmap**: A smaller, rolling window around the robot used by the local planner to react to dynamic, moving obstacles from real-time sensor data.
+
+For a bipedal robot, the costmap configuration is crucial. The **inflation radius**—an area of extra cost drawn around obstacles—must be set appropriately. For a wheeled robot, this radius might be just a few centimeters larger than its physical footprint. For a humanoid, you must account for the swing of its arms and the dynamic envelope of its walking motion. The inflation radius needs to be much larger to ensure the robot doesn't clip its arms on a doorway or bump into a table while walking.
+
+By carefully configuring the costmaps and choosing and tuning the appropriate planners, you can successfully leverage the power of Nav2 to bring autonomous, point-to-point navigation to a simulated humanoid robot, all powered by the perception pipeline you built with Isaac ROS.
