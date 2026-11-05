@@ -1,222 +1,183 @@
 ---
 sidebar_position: 7
+title: Actions & Preemptible Long-Horizon Behaviors
 ---
 
-# Actions 
+# Actions & Preemptible Long-Horizon Behaviors
 
-**Actions** in ROS 2 provide a high-level, asynchronous communication mechanism for long-running goals that require periodic feedback. They are built on top of topics and services and are particularly useful for tasks like navigating a robot to a goal, performing a complex manipulation sequence, or executing a pick-and-place operation.
+Bipedal walking, traversing stairs, or picking up a heavy box are multi-second, long-horizon tasks. Using a synchronous Service for these behaviors is dangerous: the client cannot observe intermediate progress, cannot stream corrective feedback, and most critically, **cannot cancel or preempt the behavior** if the environment dynamically changes.
 
-An Action involves:
-*   **Goal:** The desired state or task to be achieved.
-*   **Feedback:** Periodic updates on the progress of the action.
-*   **Result:** The final outcome of the action once it's complete.
+In ROS 2, long-horizon tasks are governed by **Actions**. Actions integrate three distinct communication channels: a Goal service, a Feedback topic, and a Result service, orchestrated by a formal, preemptible finite state machine.
 
-## Goal/Feedback/Result Model
+```mermaid
+stateDiagram-v2
+    [*] --> Accepted: Client Submits Goal Request
 
-*   **Action Server:** A node that receives action goals, executes the task, publishes feedback as the task progresses, and finally sends the result.
-*   **Action Client:** A node that sends an action goal to an action server, monitors the feedback, and processes the final result.
-*   **Action Name:** A unique string identifier for the action (e.g., `/navigate_to_pose`, `/gripper_control`).
-*   **Action Definition:** Defined by `.action` files, which explicitly define the structure of the goal, feedback, and result messages. The syntax is similar to services, but with three sections separated by `---`.
+    Accepted --> Executing: Server Accepts & Starts Execution
+    Accepted --> Aborted: Server Rejects (Preconditions Failed)
 
-## Creating an Action (Python Example)
+    Executing --> Executing: Publish Continuous Feedback (e.g., Footstep 4/12 completed)
+    Executing --> Succeeded: Goal Successfully Reached (Terminal)
+    Executing --> Aborted: Error during execution (Foot slipped, torque limit exceeded)
 
-Let's create a simple action for a "Countdown" task.
+    Executing --> Canceling: Client or E-Stop requests Preemption
+    Canceling --> Canceled: Safely brought to stable double-support stance (Terminal)
+    Canceling --> Aborted: Emergency recovery failed
 
-### Define the Action (`Countdown.action`)
-
-First, create an `action` directory inside `~/ros2_ws/src/my_python_pkg` (if it doesn't exist) and then `Countdown.action`:
-
+    Succeeded --> [*]
+    Canceled --> [*]
+    Aborted --> [*]
 ```
-int32 target_number
+
 ---
-int32 final_count
+
+## 1. The Tripartite Structure of an Action
+
+An action is defined in an `.action` file containing three explicit sections:
+
+```text
+# Example: humanoid_interfaces/action/ExecuteFootstepPlan.action
+
+# 1. GOAL (Sent by Client to initiate behavior)
+geometry_msgs/PoseStamped[] footsteps   # Target foot placement sequence in World frame
+float64 step_frequency_hz               # Commanded stepping cadence
+float64 swing_height_meters             # Foot clearance height
 ---
-int32 current_count
+# 2. RESULT (Sent by Server when goal reaches terminal state)
+bool plan_completed                     # True if full sequence executed
+uint32 completed_steps                  # Total steps successfully taken
+string failure_diagnostic               # Error message if aborted
+---
+# 3. FEEDBACK (Streamed continuously during execution)
+uint32 current_step_index               # Step currently being executed
+float64 phase_percentage                # Progress within current swing phase [0.0 - 1.0]
+geometry_msgs/Point measured_com        # Live Center of Mass position
+float64 zmp_error_distance              # Deviation between desired and measured ZMP
 ```
 
-### Update `package.xml`
+---
 
-Similar to services, you need to declare that your package exports an action. Add these lines to `~/ros2_ws/src/my_python_pkg/package.xml`:
+## 2. Preemption & Cancellation: The Safety Shield
 
-```xml
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>rosidl_default_generators</build_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
+In humanoid robotics, **preemption** is the difference between safe recovery and catastrophic mechanical destruction. Consider a scenario where a humanoid receives a goal to walk 10 meters forward:
+1. At meter 4, an unforeseen human walks directly into the robot's planned trajectory.
+2. The vision system detects the obstacle and immediately calls `goal_handle->async_cancel_goal()`.
+3. The Action Server intercepts the cancellation request. It does **not** instantly cut motor power (which would cause the robot to collapse); instead, it modifies the active step trajectory to place both feet firmly on the ground into a stable **double-support stance**.
+4. Once static equilibrium is achieved, the server transitions the state machine to `STATUS_CANCELED` and returns the final result.
+
+---
+
+## 3. Production C++20 Bipedal Step Action Server
+
+Below is an industrial implementation of a ROS 2 Action Server managing a bipedal stepping trajectory with live feedback streaming and graceful cancellation:
+
+```cpp
+#include <chrono>
+#include <memory>
+#include <thread>
+
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
+#include "humanoid_interfaces/action/execute_footstep_plan.hpp"
+
+using ExecuteFootstepPlan = humanoid_interfaces::action::ExecuteFootstepPlan;
+using GoalHandleFootsteps = rclcpp_action::ServerGoalHandle<ExecuteFootstepPlan>;
+
+class FootstepActionServer : public rclcpp::Node {
+public:
+  FootstepActionServer() : Node("footstep_action_server") {
+    using namespace std::placeholders;
+
+    // Instantiate Action Server with Goal, Cancel, and Accepted callbacks
+    action_server_ = rclcpp_action::create_server<ExecuteFootstepPlan>(
+      this,
+      "/locomotion/execute_footsteps",
+      std::bind(&FootstepActionServer::handle_goal, this, _1, _2),
+      std::bind(&FootstepActionServer::handle_cancel, this, _1),
+      std::bind(&FootstepActionServer::handle_accepted, this, _1));
+
+    RCLCPP_INFO(get_logger(), "Footstep Action Server online and ready.");
+  }
+
+private:
+  // 1. Goal validation callback: verify feasibility before accepting
+  rclcpp_action::GoalResponse handle_goal(
+    const rclcpp_action::GoalUUID & /*uuid*/,
+    std::shared_ptr<const ExecuteFootstepPlan::Goal> goal)
+  {
+    RCLCPP_INFO(get_logger(), "Received request with %zu footsteps.", goal->footsteps.size());
+    if (goal->footsteps.empty() || goal->swing_height_meters <= 0.01) {
+      RCLCPP_WARN(get_logger(), "Rejected: Empty plan or invalid swing height.");
+      return rclcpp_action::GoalResponse::REJECT;
+    }
+    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
+  }
+
+  // 2. Cancellation request callback: allow graceful preemption
+  rclcpp_action::CancelResponse handle_cancel(
+    const std::shared_ptr<GoalHandleFootsteps> /*goal_handle*/)
+  {
+    RCLCPP_WARN(get_logger(), "Cancellation requested! Transitioning to double-support stance.");
+    return rclcpp_action::CancelResponse::ACCEPT;
+  }
+
+  // 3. Execution kickoff: spawn asynchronous worker thread
+  void handle_accepted(const std::shared_ptr<GoalHandleFootsteps> goal_handle) {
+    std::thread{std::bind(&FootstepActionServer::execute_stepping_loop, this, goal_handle)}.detach();
+  }
+
+  // 4. Execution loop: dispatch step trajectory and publish live feedback
+  void execute_stepping_loop(const std::shared_ptr<GoalHandleFootsteps> goal_handle) {
+    const auto goal = goal_handle->get_goal();
+    auto feedback = std::make_shared<ExecuteFootstepPlan::Feedback>();
+    auto result = std::make_shared<ExecuteFootstepPlan::Result>();
+
+    rclcpp::Rate loop_rate(50); // 50 Hz feedback updates
+    uint32_t step_idx = 0;
+
+    for (const auto & step : goal->footsteps) {
+      // Check if client requested cancellation
+      if (goal_handle->is_canceling()) {
+        result->plan_completed = false;
+        result->completed_steps = step_idx;
+        result->failure_diagnostic = "Preempted: Graceful stop engaged.";
+        goal_handle->canceled(result);
+        RCLCPP_INFO(get_logger(), "Goal successfully canceled in stable double support.");
+        return;
+      }
+
+      // Execute step phase [0.0 -> 1.0]
+      for (double phase = 0.0; phase <= 1.0; phase += 0.02) {
+        if (!rclcpp::ok()) return;
+
+        feedback->current_step_index = step_idx;
+        feedback->phase_percentage = phase;
+        feedback->zmp_error_distance = 0.012; // Simulated live ZMP error (m)
+        goal_handle->publish_feedback(feedback);
+
+        loop_rate.sleep();
+      }
+      step_idx++;
+    }
+
+    // Goal finished successfully
+    if (rclcpp::ok()) {
+      result->plan_completed = true;
+      result->completed_steps = step_idx;
+      goal_handle->succeed(result);
+      RCLCPP_INFO(get_logger(), "All %u footsteps completed successfully.", step_idx);
+    }
+  }
+
+  rclcpp_action::Server<ExecuteFootstepPlan>::SharedPtr action_server_;
+};
+
+int main(int argc, char * argv[]) {
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<FootstepActionServer>());
+  rclcpp::shutdown();
+  return 0;
+}
 ```
 
-### Update `setup.py`
-
-You also need to tell `setup.py` to process the `.action` files.
-Modify the `data_files` section in `~/ros2_ws/src/my_python_pkg/setup.py`:
-
-```python
-from setuptools import find_packages, setup
-import os
-from glob import glob
-
-package_name = 'my_python_pkg'
-
-setup(
-    name=package_name,
-    version='0.0.0',
-    packages=find_packages(exclude=['test']),
-    data_files=[
-        ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/srv', glob('srv/*.srv')),
-        ('share/' + package_name + '/action', glob('action/*.action')), # Add this line
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
-        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yeml]*'))),
-    ],
-    install_requires=['setuptools'],
-    zip_safe=True,
-    maintainer='your_name',
-    maintainer_email='your_email@example.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
-    tests_require=['pytest'],
-    entry_points={
-        'console_scripts': [
-            'talker = my_python_pkg.talker_node:main',
-            'talker_publisher = my_python_pkg.talker_publisher:main',
-            'listener_subscriber = my_python_pkg.listener_subscriber:main',
-            'add_two_ints_server = my_python_pkg.add_two_ints_server:main',
-            'add_two_ints_client = my_python_pkg.add_two_ints_client:main',
-            'countdown_action_server = my_python_pkg.countdown_action_server:main',
-            'countdown_action_client = my_python_pkg.countdown_action_client:main',
-        ],
-    },
-)
-```
-
-### Action Server (`countdown_action_server.py`)
-
-Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/countdown_action_server.py`:
-
-```python
-import time
-import rclpy
-from rclpy.action import ActionServer
-from rclpy.node import Node
-from my_python_pkg.action import Countdown # Import your action type
-
-class CountdownActionServer(Node):
-    def __init__(self):
-        super().__init__('countdown_action_server')
-        self._action_server = ActionServer(
-            self,
-            Countdown,
-            'countdown',
-            self.execute_callback)
-        self.get_logger().info('Countdown Action Server ready.')
-
-    async def execute_callback(self, goal_handle):
-        self.get_logger().info('Executing goal...')
-        feedback_msg = Countdown.Feedback()
-        for i in range(goal_handle.request.target_number, 0, -1):
-            feedback_msg.current_count = i
-            self.get_logger().info(f'Feedback: {i}')
-            goal_handle.publish_feedback(feedback_msg)
-            time.sleep(1)
-
-        goal_handle.succeed()
-        result = Countdown.Result()
-        result.final_count = 0 # Counted down to 0
-        self.get_logger().info('Goal succeeded!')
-        return result
-
-def main(args=None):
-    rclpy.init(args=args)
-    countdown_action_server = CountdownActionServer()
-    rclpy.spin(countdown_action_server)
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
-```
-
-### Action Client (`countdown_action_client.py`)
-
-Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/countdown_action_client.py`:
-
-```python
-import rclpy
-from rclpy.action import ActionClient
-from rclpy.node import Node
-from my_python_pkg.action import Countdown # Import your action type
-
-class CountdownActionClient(Node):
-    def __init__(self):
-        super().__init__('countdown_action_client')
-        self._action_client = ActionClient(self, Countdown, 'countdown')
-        self.get_logger().info('Countdown Action Client ready.')
-
-    def send_goal(self, target_number):
-        self.get_logger().info('Waiting for action server...')
-        self._action_client.wait_for_server()
-
-        goal_msg = Countdown.Goal()
-        goal_msg.target_number = target_number
-
-        self.get_logger().info('Sending goal request...')
-        self._send_goal_future = self._action_client.send_goal_async(
-            goal_msg,
-            feedback_callback=self.feedback_callback)
-
-        self._send_goal_future.add_done_callback(self.goal_response_callback)
-
-    def goal_response_callback(self, future):
-        goal_handle = future.result()
-        if not goal_handle.accepted:
-            self.get_logger().info('Goal rejected :(')
-            return
-
-        self.get_logger().info('Goal accepted :)')
-        self._get_result_future = goal_handle.get_result_async()
-        self._get_result_future.add_done_callback(self.get_result_callback)
-
-    def get_result_callback(self, future):
-        result = future.result().result
-        self.get_logger().info(f'Result: Final count {result.final_count}')
-        rclpy.shutdown()
-
-    def feedback_callback(self, feedback_msg):
-        self.get_logger().info(f'Received feedback: {feedback_msg.feedback.current_count}')
-
-def main(args=None):
-    rclpy.init(args=args)
-    action_client = CountdownActionClient()
-    action_client.send_goal(5) # Example: countdown from 5
-    rclpy.spin(action_client)
-    #rclpy.shutdown() # Shutdown handled in get_result_callback for this example
-
-if __name__ == '__main__':
-    main()
-```
-
-## Building and Running
-
-1.  **Build the workspace (including new action definition):**
-    ```bash
-    cd ~/ros2_ws
-    colcon build --packages-select my_python_pkg
-    source install/setup.bash
-    ```
-2.  **Run the action server in one terminal:**
-    ```bash
-    ros2 run my_python_pkg countdown_action_server
-    ```
-3.  **Run the action client in another terminal:**
-    ```bash
-    ros2 run my_python_pkg countdown_action_client
-    ```
-    You should see the client sending a goal, the server executing it with feedback, and finally sending a result.
-
-## `ros2 action` Commands
-
-*   **`ros2 action list`:** Lists all active actions.
-*   **`ros2 action info <action_name>`:** Displays information about an action, including clients and servers.
-*   **`ros2 action send_goal <action_name> <action_type> <goal_json>`:** Sends a goal to an action server from the command line.
-
-Actions provide a robust way to handle complex, long-running tasks in a robotic system, giving clients better control and visibility over the task's progress.
+In the next chapter, we explore configuration management: **Distributed Parameters, Parameter Descriptors, and Dynamic Gain Reconfiguration**.
