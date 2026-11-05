@@ -2,7 +2,7 @@
 
 FastAPI backend for the **Physical AI & Humanoid Robotics** RAG (Retrieval-Augmented Generation) system.
 
-The agent answers questions about the book exclusively from content stored in Qdrant, using OpenAI's `gpt-4o-mini` and Cohere embeddings.
+The agent answers questions about the book exclusively from content stored in Qdrant, using Google Gemini's `gemini-2.0-flash` and Cohere embeddings.
 
 ---
 
@@ -11,7 +11,7 @@ The agent answers questions about the book exclusively from content stored in Qd
 ```
 backend/
 ├── app/
-│   ├── agent/              # OpenAI tool-calling agent
+│   ├── agent/              # Google Gemini tool-calling agent
 │   │   └── agent_service.py
 │   ├── core/               # Config & logging
 │   │   ├── config.py       # Pydantic-settings (reads .env)
@@ -50,7 +50,7 @@ backend/
 
 - Python 3.13
 - [`uv`](https://docs.astral.sh/uv/) (fast Python package manager)
-- Accounts on [Qdrant Cloud](https://qdrant.tech/) and [OpenAI](https://platform.openai.com/)
+- Accounts on [Qdrant Cloud](https://qdrant.tech/) and [Google AI Studio](https://aistudio.google.com/)
 
 ### 2. Install dependencies
 
@@ -67,7 +67,7 @@ cp .env.example .env
 #   COHERE_API_KEY=...
 #   QDRANT_API_KEY=...
 #   QDRANT_URL=...
-#   OPENAI_API_KEY=...
+#   GEMINI_API_KEY=...
 ```
 
 ### 4. Start the server
@@ -125,7 +125,7 @@ pytest tests/ -v
 | `COHERE_API_KEY`  | ✅       | —                  | Cohere API key (embeddings)       |
 | `QDRANT_API_KEY`  | ✅       | —                  | Qdrant Cloud API key              |
 | `QDRANT_URL`      | ✅       | —                  | Qdrant cluster URL                |
-| `OPENAI_API_KEY`  | ✅       | —                  | OpenAI API key (GPT-4o-mini)      |
+| `GEMINI_API_KEY`  | ✅       | —                  | Google Gemini API key (gemini-2.0-flash) |
 | `COLLECTION_NAME` | ❌       | `ragbot_embedding` | Qdrant collection name            |
 
 ---

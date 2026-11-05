@@ -15,9 +15,8 @@ dependencies = [
     "uvicorn[standard]",
     "pydantic",
     "pydantic-settings",
-    "openai",
-    "tiktoken",
     "httpx",   # Required by FastAPI TestClient
+    "google-genai>=2.34.0",
 ]
 
 [project.optional-dependencies]
