@@ -5,13 +5,15 @@
  * Features:
  * - Sends user queries to POST /ask on the configured backend.
  * - Displays user and agent messages in a scrollable chat history.
- * - Shows a loading indicator while awaiting the agent's response.
+ * - Shows a pulsing typing indicator while awaiting a response.
  * - Displays source citations from the agent's retrieved context.
  * - Handles network errors gracefully with user-friendly messages.
  * - Prevents submission of empty queries.
  * - Automatically scrolls to the latest message.
- * - Keyboard accessible (Enter to send, Shift+Enter for newline future support).
+ * - Keyboard accessible (Enter to send).
  * - ARIA live region for screen reader announcements.
+ * - Clear chat button.
+ * - Welcome message on first load.
  *
  * Environment configuration:
  *   REACT_APP_FASTAPI_BASE_URL — Override the backend URL (default: http://127.0.0.1:8000)
@@ -46,8 +48,6 @@ interface AskResponse {
  * falling back to localhost for local development.
  */
 function getBackendUrl(): string {
-  // process.env.REACT_APP_FASTAPI_BASE_URL is injected by docusaurus.config.ts
-  // via the custom webpack DefinePlugin.
   return (process.env.REACT_APP_FASTAPI_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8000';
 }
 
@@ -55,17 +55,24 @@ function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+const WELCOME_MESSAGE: ChatMessage = {
+  id: 'welcome',
+  text: 'Hello! I\'m your RAG-powered AI assistant for the Physical AI & Humanoid Robotics book. Ask me anything about ROS 2, Digital Twins, NVIDIA Isaac, Vision-Language-Action models, and more!',
+  sender: 'agent',
+  timestamp: new Date(),
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
 const ChatWidget: React.FC = () => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // Ref to the bottom of the message list — used for auto-scroll.
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   /** Scroll the message area to the latest message. */
   const scrollToBottom = useCallback(() => {
@@ -77,6 +84,14 @@ const ChatWidget: React.FC = () => {
   }, [messages, scrollToBottom]);
 
   // ------------------------------------------------------------------
+  // Clear chat
+  // ------------------------------------------------------------------
+  const handleClear = useCallback(() => {
+    setMessages([WELCOME_MESSAGE]);
+    inputRef.current?.focus();
+  }, []);
+
+  // ------------------------------------------------------------------
   // Send message handler
   // ------------------------------------------------------------------
 
@@ -84,7 +99,6 @@ const ChatWidget: React.FC = () => {
     const trimmed = inputMessage.trim();
     if (!trimmed || isLoading) return;
 
-    // Append the user's message immediately.
     const userMessage: ChatMessage = {
       id: generateId(),
       text: trimmed,
@@ -107,7 +121,6 @@ const ChatWidget: React.FC = () => {
       });
 
       if (!response.ok) {
-        // Try to surface the FastAPI error detail.
         let detail = `HTTP ${response.status}`;
         try {
           const errData = await response.json();
@@ -163,12 +176,36 @@ const ChatWidget: React.FC = () => {
 
   return (
     <div className={styles.chatContainer} role="region" aria-label="RAG Chat Assistant">
-      {/* Header */}
+      {/* ---- Header ---- */}
       <div className={styles.chatHeader}>
-        <span>🤖 RAG Assistant — Ask about the book</span>
+        <div className={styles.chatHeaderLeft}>
+          <span className={styles.chatHeaderIcon}>🤖</span>
+          <div>
+            <div className={styles.chatHeaderTitle}>RAG Assistant</div>
+            <div className={styles.chatHeaderSub}>Physical AI & Humanoid Robotics</div>
+          </div>
+        </div>
+
+        <div className={styles.chatHeaderRight}>
+          {/* Online status */}
+          <div className={styles.statusDot}>
+            <div className={`${styles.statusDotCircle} ${isLoading ? '' : ''}`} />
+            {isLoading ? 'Thinking…' : 'Online'}
+          </div>
+
+          {/* Clear chat */}
+          <button
+            className={styles.clearButton}
+            onClick={handleClear}
+            aria-label="Clear chat history"
+            title="Clear chat"
+          >
+            🗑 Clear
+          </button>
+        </div>
       </div>
 
-      {/* Message area — ARIA live region so screen readers announce new messages */}
+      {/* ---- Message area — ARIA live region ---- */}
       <div
         className={styles.messageDisplay}
         role="log"
@@ -178,7 +215,13 @@ const ChatWidget: React.FC = () => {
       >
         {messages.length === 0 && (
           <div className={styles.emptyState}>
-            Ask me anything about <strong>Physical AI &amp; Humanoid Robotics</strong>!
+            <span className={styles.emptyStateIcon}>💬</span>
+            <p className={styles.emptyStateText}>
+              Ask me anything about <strong>Physical AI & Humanoid Robotics</strong>!
+            </p>
+            <p className={styles.emptyStateHint}>
+              Try: "What is ROS 2?" or "Explain Vision-Language-Action models"
+            </p>
           </div>
         )}
 
@@ -219,11 +262,13 @@ const ChatWidget: React.FC = () => {
           </div>
         ))}
 
-        {/* Loading indicator */}
+        {/* Pulsing typing indicator */}
         {isLoading && (
-          <div className={styles.loadingIndicator} role="status" aria-live="assertive">
-            <span className={styles.loadingDots}>Agent is thinking</span>
-            <span aria-hidden="true">…</span>
+          <div className={styles.loadingIndicator} role="status" aria-live="assertive" aria-label="Agent is thinking">
+            <div className={styles.typingDots}>
+              <span /><span /><span />
+            </div>
+            Agent is thinking…
           </div>
         )}
 
@@ -231,9 +276,10 @@ const ChatWidget: React.FC = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input area */}
+      {/* ---- Input area ---- */}
       <div className={styles.inputArea}>
         <input
+          ref={inputRef}
           type="text"
           className={styles.messageInput}
           placeholder="Ask a question about the book…"
@@ -251,7 +297,8 @@ const ChatWidget: React.FC = () => {
           disabled={isLoading || !inputMessage.trim()}
           aria-label="Send message"
         >
-          Send
+          <span className={styles.sendIcon}>✈️</span>
+          <span className={styles.sendButtonLabel}>Send</span>
         </button>
       </div>
     </div>
