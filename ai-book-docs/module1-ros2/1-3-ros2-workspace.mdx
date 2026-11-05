@@ -1,74 +1,186 @@
 ---
 sidebar_position: 3
+title: Workspace Architecture & Build Orchestration
 ---
 
-# Workspace and Packages
+# Workspace Architecture & Build Orchestration
 
-A ROS 2 **workspace** is a directory on your filesystem where you can store, build, and manage your ROS 2 packages. It's the central place for developing your robot applications.
+Developing software for an autonomous humanoid robot requires organizing hundreds of interdependent source files—ranging from real-time motor drivers and whole-body inverse dynamics solvers to perception models and custom teleoperation interfaces. 
 
-## Colcon: The Build System
+A professional humanoid robotics repository must adhere to rigorous architectural standards, modular build isolation, and deterministic deployment practices using the **Colcon** build orchestration system.
 
-`colcon` is the primary build tool for ROS 2. It's a command-line tool that automates the process of building, testing, and installing multiple packages in a workspace. `colcon` is designed to be flexible and extensible, supporting various build types (e.g., `ament_cmake`, `ament_python`).
+```mermaid
+graph TD
+    subgraph HumanoidWorkspace["Humanoid Robot Workspace Layout (humanoid_ws/src)"]
+        direction TB
 
-## Creating a Workspace
+        subgraph CoreInterfaces["1. Interfaces Layer (Zero Dependencies)"]
+            Interfaces["humanoid_msgs / humanoid_interfaces<br/>(Custom JointTrajectory, CoMState, FootstepPlan)"]
+        end
 
-To create a new ROS 2 workspace, you typically follow these steps:
+        subgraph MechanicalDescription["2. Description & Asset Layer"]
+            Description["humanoid_description<br/>(Modular Xacro, URDF, Collision Meshes, Inertia Tensors)"]
+        end
 
-1.  **Create the workspace directory:**
-    ```bash
-    mkdir -p ~/ros2_ws/src
-    ```
-    The `src` subdirectory is where your source packages will reside.
+        subgraph ControlHardware["3. Real-Time Hardware & Controllers Layer (C++20)"]
+            Hardware["humanoid_hardware<br/>(ros2_control HardwareInterface, EtherCAT / CAN-FD drivers)"]
+            Controllers["humanoid_controllers<br/>(Whole-Body QP Controller, Bipedal ZMP Balance, Impedance)"]
+        end
 
-2.  **Navigate into the workspace:**
-    ```bash
-    cd ~/ros2_ws
-    ```
+        subgraph HighLevelPerception["4. Perception & Navigation Layer (C++ / Python)"]
+            Perception["humanoid_perception<br/>(Stereo VIO, 3D Elevation Mapping, PointCloud filtering)"]
+            Navigation["humanoid_navigation<br/>(Nav2 Bipedal Step Planner, Costmap3D plugins)"]
+        end
 
-## Packages
+        subgraph IntegrationBringup["5. Bringup & Configuration Layer"]
+            Bringup["humanoid_bringup<br/>(Launch orchestrators, YAML parameter files, RViz2 configs)"]
+        end
+    end
 
-A **package** is the fundamental unit of organization in ROS 2. It contains source code, build scripts, configuration files, and other resources that together provide a specific functionality (e.g., a driver for a sensor, an algorithm for path planning, or a set of launch files).
-
-Every ROS 2 package must contain a `package.xml` file, which provides metadata about the package (name, version, description, dependencies, maintainers).
-
-## Creating a New Package
-
-You can create a new ROS 2 package using the `ros2 pkg create` command. This command generates a basic package structure with necessary files.
-
-For a Python package:
-```bash
-cd ~/ros2_ws/src
-ros2 pkg create --build-type ament_python my_robot_controller
+    Interfaces --> Hardware
+    Interfaces --> Controllers
+    Interfaces --> Navigation
+    Description --> Hardware
+    Description --> Controllers
+    Hardware --> Controllers
+    Controllers --> Bringup
+    Navigation --> Bringup
 ```
 
-For a C++ package:
-```bash
-cd ~/ros2_ws/src
-ros2 pkg create --build-type ament_cmake my_sensor_driver
+---
+
+## 1. Directory Anatomy of a Production Humanoid Workspace
+
+A clean ROS 2 workspace separates source code from build artifacts, installation targets, and runtime telemetry:
+
+```text
+humanoid_ws/
+├── src/                               # Version-controlled source code packages
+│   ├── core/                          # Low-level infrastructure and hardware drivers
+│   │   ├── humanoid_interfaces/       # Custom .msg, .srv, and .action definitions
+│   │   └── humanoid_hardware/         # ros2_control HardwareInterface plugins
+│   ├── kinematics_dynamics/           # Whole-body control and model solvers
+│   │   ├── humanoid_description/      # URDF / Xacro kinematic meshes and limits
+│   │   └── humanoid_controllers/      # QP and ZMP bipedal balance controllers
+│   ├── perception/                    # Vision and state estimation
+│   │   └── humanoid_perception/       # Sensor drivers, filters, and VSLAM nodes
+│   └── bringup/                       # Launch scripts and parameter configs
+│       └── humanoid_bringup/          # Top-level launch files and safety orchestrators
+├── build/                             # Intermediate compiler artifacts (CMake object files)
+├── install/                           # Deployed binaries, libraries, setup scripts
+└── log/                               # Structured colcon build and test logs
 ```
 
-## Building a Workspace
+---
 
-After adding or modifying packages in your workspace, you need to build them using `colcon`:
-```bash
-cd ~/ros2_ws
-colcon build
+## 2. Underlays vs. Overlays: Clean Compute Isolation
+
+On frontier humanoid robots (e.g., Unitree H1 or Figure 02), the onboard operating system maintains a strict separation between **Underlay** dependencies and **Overlay** development code:
+
+```mermaid
+flowchart LR
+    Underlay["Base System Underlay<br/>(/opt/ros/jazzy or /opt/ros/humble)<br/>(DDS, rclcpp, tf2, ros2_control)"] -->|source /opt/ros/jazzy/setup.bash| Overlay1["Firmware / Vendor Overlay<br/>(/opt/unitree_robot_sdk)<br/>(EtherCAT masters, BLDC low-level libraries)"]
+    Overlay1 -->|source /opt/unitree/setup.bash| Overlay2["Humanoid Workspace Overlay<br/>(~/humanoid_ws/install)<br/>(Your Custom AI, WBC, Perception, Nav2)"]
 ```
-This command compiles your code, generates executables, and installs necessary files into the `install` directory within your workspace.
 
-## Sourcing the Setup Files
+When building or executing, variables such as `AMENT_PREFIX_PATH`, `CMAKE_PREFIX_PATH`, and `LD_LIBRARY_PATH` are prepended hierarchically, ensuring that the custom application layer can override default packages without altering core system libraries.
 
-To use the executables and libraries from your workspace, you need to **source** the setup files generated by `colcon`. This adds your workspace's environment variables to your shell.
+---
+
+## 3. High-Performance C++20 `CMakeLists.txt` for Humanoid Nodes
+
+Real-time humanoid controllers cannot afford performance regressions from suboptimal compiler flags. The template below illustrates an industrial `CMakeLists.txt` configured for hard real-time execution:
+
+```cmake
+cmake_minimum_required(VERSION 3.20)
+project(humanoid_controllers LANGUAGES CXX)
+
+# Enforce modern C++20 standard
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Aggressive compiler optimizations for real-time math
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(
+    -O3                    # Maximum optimization
+    -march=native          # Utilize host CPU vector extensions (AVX-512 / NEON)
+    -Wall -Wextra -Wpedantic
+    -Werror=return-type
+    -pipe
+  )
+endif()
+
+# Core ROS 2 dependencies
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
+find_package(controller_interface REQUIRED)
+find_package(hardware_interface REQUIRED)
+find_package(pluginlib REQUIRED)
+find_package(humanoid_interfaces REQUIRED)
+find_package(Eigen3 REQUIRED)
+
+# Include directories
+include_directories(include)
+
+# Build Whole-Body Controller Shared Library (Plugin for ros2_control)
+add_library(humanoid_wbc_controller SHARED
+  src/whole_body_controller.cpp
+  src/qp_solver_interface.cpp
+)
+
+target_include_directories(humanoid_wbc_controller PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+  ${EIGEN3_INCLUDE_DIRS}
+)
+
+ament_target_dependencies(humanoid_wbc_controller
+  rclcpp
+  rclcpp_lifecycle
+  controller_interface
+  hardware_interface
+  pluginlib
+  humanoid_interfaces
+)
+
+# Export plugin description for controller_manager dynamic loading
+pluginlib_export_plugin_description_file(controller_interface humanoid_controllers.xml)
+
+# Install rules
+install(TARGETS humanoid_wbc_controller
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY include/ DESTINATION include)
+
+ament_package()
+```
+
+---
+
+## 4. Colcon Build Flags & Deterministic Orchestration
+
+When compiling on edge compute hardware (e.g., an 8-core NVIDIA Jetson Orin with thermal throttling limits), building naively can exhaust RAM and trigger out-of-memory (OOM) kernel kills. Professional roboticists use tuned build invocations:
 
 ```bash
-# In your ~/ros2_ws directory
-source install/setup.bash  # For bash/zsh
-# source install/setup.ps1 # For PowerShell
+# 1. Standard build with symlink installation (avoids recompiling Python/launch files)
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# 2. Constrained parallel compilation to avoid thermal and RAM exhaustion on edge hardware
+colcon build \
+  --symlink-install \
+  --parallel-workers 4 \
+  --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+# 3. Target single package with dependency resolution
+colcon build --packages-up-to humanoid_controllers --symlink-install
+
+# 4. Source the built overlay workspace
+source install/setup.bash
 ```
-It's common practice to source the main ROS 2 installation first, and then your workspace setup files, to ensure your workspace's packages take precedence.
 
-## Overlays
-
-ROS 2 workspaces can be **overlaid**. This means you can build a new workspace on top of an existing one (e.g., your development workspace on top of your main ROS 2 installation). This allows you to work on specific packages without rebuilding the entire ROS 2 distribution.
-
-The workspace model with `colcon` and packages promotes modularity, reusability, and efficient development workflows in ROS 2.
+In the next chapter, we dive deep into the execution entity itself: **Constructing Real-Time Nodes and Managed Lifecycle State Machines**.
