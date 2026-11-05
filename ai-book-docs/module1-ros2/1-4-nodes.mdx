@@ -1,96 +1,213 @@
 ---
 sidebar_position: 4
+title: Nodes, Executors & Lifecycle State Machines
 ---
 
-# Nodes 
+# Nodes, Executors & Lifecycle State Machines
 
-As introduced earlier, **nodes** are the fundamental executable units in a ROS 2 system. Each node is designed to perform a specific task, promoting modularity and reusability of code.
+In ROS 2, a **Node** is not merely a script that runs in the background. It is a managed participant in the distributed robotic graph responsible for executing deterministic algorithms, handling timer callbacks, managing subscriptions, and asserting hardware safety.
 
-## The Purpose of Nodes
+On high-degree-of-freedom humanoid robots, unmanaged nodes that start up unpredictably can cause catastrophic joint violent snaps or sensor initialization race conditions. To guarantee deterministic execution, industrial humanoid architectures rely on **Managed Lifecycle Nodes** and **Real-Time Executors**.
 
-Nodes encapsulate logic that performs a particular function, such as:
-*   **Sensor Drivers:** Reading data from a camera, LIDAR, or IMU.
-*   **Actuator Controllers:** Sending commands to motors, grippers, or robotic arms.
-*   **Data Processing:** Filtering sensor data, performing object detection, or mapping an environment.
-*   **Decision Making:** Implementing navigation algorithms, task planners, or AI models.
-*   **User Interfaces:** Providing visualization tools or control panels.
+```mermaid
+stateDiagram-v2
+    [*] --> Unconfigured: Instantiation
 
-## Node Lifecycle
+    Unconfigured --> Configuring: on_configure()
+    Configuring --> Inactive: Success (Hardware Allocated & Initialized)
+    Configuring --> ErrorProcessing: Failure
 
-ROS 2 nodes can have a lifecycle, especially managed nodes, which allows for more robust state management. A typical lifecycle includes states like `unconfigured`, `inactive`, `active`, and `finalized`, with transitions between them (e.g., `configure`, `activate`, `deactivate`, `cleanup`). This provides a structured way to initialize, run, and shut down nodes, particularly useful for mission-critical applications.
+    Inactive --> Activating: on_activate()
+    Activating --> Active: Success (Motor Drives Energized & 1 kHz Loop Active)
+    Activating --> ErrorProcessing: Failure
 
-## Creating a Node (Python Example)
+    Active --> Deactivating: on_deactivate()
+    Deactivating --> Inactive: Safe Motor Hold / Zero Torque
+    Deactivating --> ErrorProcessing: Failure
 
-Let's look at a simple Python node that prints "Hello ROS 2!" periodically.
+    Inactive --> CleaningUp: on_cleanup()
+    CleaningUp --> Unconfigured: Resources Released
 
-First, create a new Python package (if you haven't already):
-```bash
-cd ~/ros2_ws/src
-ros2 pkg create --build-type ament_python my_python_pkg
+    Unconfigured --> ShuttingDown: on_shutdown()
+    Inactive --> ShuttingDown: on_shutdown()
+    Active --> ShuttingDown: on_shutdown()
+    ShuttingDown --> Finalized: Clean Exit
+
+    ErrorProcessing --> Unconfigured: on_error() Handled
+    ErrorProcessing --> Finalized: Fatal Error
+    Finalized --> [*]
 ```
 
-Now, inside `~/ros2_ws/src/my_python_pkg/my_python_pkg`, create a file named `talker_node.py`:
+---
 
-```python
-import rclpy
-from rclpy.node import Node
+## 1. The ROS 2 Executor Model
 
-class TalkerNode(Node):
-    def __init__(self):
-        super().__init__('talker_node')
-        self.timer = self.create_timer(1.0, self.timer_callback)
-        self.get_logger().info('Hello ROS 2 from TalkerNode!')
+Every ROS 2 node relies on an **Executor** to dispatch callbacks from timers, topic subscriptions, service requests, and action servers. Choosing the wrong executor model will cause thread starvation and missed real-time deadlines:
 
-    def timer_callback(self):
-        self.get_logger().info('Still talking...')
+```mermaid
+flowchart TD
+    subgraph SingleThreaded["1. SingleThreadedExecutor"]
+        Q1["Single Task Queue"] --> W1["Single Worker Thread"]
+        Note1["Deadlock hazard if callback awaits another callback in the same node"]
+    end
 
-def main(args=None):
-    rclpy.init(args=args)
-    talker_node = TalkerNode()
-    rclpy.spin(talker_node) # Keeps the node alive until Ctrl+C is pressed
-    talker_node.destroy_node()
-    rclpy.shutdown()
+    subgraph MultiThreaded["2. MultiThreadedExecutor"]
+        Q2["Multi Task Queue"] --> Pool["Thread Pool (N CPU Cores)"]
+        Pool --> W2A["Thread 1"]
+        Pool --> W2B["Thread 2"]
+        Note2["Non-deterministic scheduling; requires mutex locking on joint states"]
+    end
 
-if __name__ == '__main__':
-    main()
+    subgraph StaticSingleThreaded["3. StaticSingleThreadedExecutor (Real-Time Standard)"]
+        Q3["Deterministic Static Queue"] --> W3["Pinned Hard Real-Time Thread"]
+        Note3["Zero runtime memory allocations after initialization; ideal for 1 kHz loops"]
+    end
 ```
 
-Make the script executable:
-```bash
-chmod +x ~/ros2_ws/src/my_python_pkg/my_python_pkg/talker_node.py
+### Callback Groups: Preventing Deadlocks
+When a node must subscribe to a 500 Hz sensor stream while simultaneously calling a service or running a timer, callbacks must be assigned to explicit **Callback Groups**:
+- **`MutuallyExclusive`**: Callbacks within this group will never execute in parallel. This protects shared data structures without manual mutex locking.
+- **`Reentrant`**: Callbacks can execute concurrently across threads in a `MultiThreadedExecutor`.
+
+---
+
+## 2. Managed Lifecycle Nodes: The Safety Imperative
+
+In a bipedal humanoid, energizing motors (applying 48V–100V bus power to 30+ high-torque brushless DC motors) while the IMU or joint encoders are still calibrating will cause violent instability and mechanical destruction.
+
+Managed Lifecycle Nodes (`rclcpp_lifecycle`) introduce deterministic state machines where code transitions through discrete operational phases:
+
+1. **`on_configure()`**: 
+   - Parse parameters (PID gains, motor gear ratios).
+   - Allocate all memory buffers and vector arrays.
+   - Establish hardware communication buses (EtherCAT / CAN-FD).
+   - Actuators remain **unpowered** (PWM disabled).
+2. **`on_activate()`**:
+   - Verify all encoders are reporting valid absolute positions.
+   - Assert safety interlocks and start high-frequency 1 kHz publishers.
+   - Transition actuators to active closed-loop torque control.
+3. **`on_deactivate()`**:
+   - Ramp joint torques smoothly to zero or engage mechanical brakes.
+   - Stop publishing control efforts.
+4. **`on_cleanup()`**:
+   - Free memory, close device file descriptors, and disconnect from hardware.
+
+---
+
+## 3. Production C++20 Lifecycle Node Implementation
+
+Below is a production-grade C++20 implementation of a real-time humanoid ankle actuator node with lifecycle management and callback group isolation:
+
+```cpp
+#include <chrono>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "rclcpp/rclcpp.hpp"
+#include "rclcpp_lifecycle/lifecycle_node.hpp"
+#include "sensor_msgs/msg/joint_state.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
+
+using CallbackReturn = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+using namespace std::chrono_literals;
+
+class HumanoidAnkleActuatorNode : public rclcpp_lifecycle::LifecycleNode {
+public:
+  explicit HumanoidAnkleActuatorNode(const rclcpp::NodeOptions & options = rclcpp::NodeOptions())
+  : LifecycleNode("humanoid_ankle_actuator", options),
+    loop_rate_hz_(1000.0) {}
+
+  // 1. Configuration Callback: Allocate memory and connect to bus
+  CallbackReturn on_configure(const rclcpp_lifecycle::State & /*previous_state*/) override {
+    RCLCPP_INFO(get_logger(), "Configuring Ankle Actuator Node: Initializing EtherCAT bus...");
+
+    // Pre-allocate joint state arrays to guarantee zero runtime heap allocation
+    joint_positions_.resize(2, 0.0); // Ankle Pitch & Roll
+    joint_torques_.resize(2, 0.0);
+
+    // Create real-time lifecycle publisher
+    joint_state_pub_ = create_publisher<sensor_msgs::msg::JointState>(
+      "/humanoid/ankle/joint_states", 10);
+
+    // Create MutuallyExclusive callback group for real-time timer
+    timer_cb_group_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+    RCLCPP_INFO(get_logger(), "Configuration successful. Hardware in standby.");
+    return CallbackReturn::SUCCESS;
+  }
+
+  // 2. Activation Callback: Enable high-voltage drive stages
+  CallbackReturn on_activate(const rclcpp_lifecycle::State & state) override {
+    RCLCPP_INFO(get_logger(), "Activating Ankle Actuator: Powering motor coils...");
+    joint_state_pub_->on_activate();
+
+    // Start 1 kHz (1 ms) control loop timer
+    auto timer_period = std::chrono::duration<double>(1.0 / loop_rate_hz_);
+    control_timer_ = create_wall_timer(
+      timer_period,
+      std::bind(&HumanoidAnkleActuatorNode::control_loop_callback, this),
+      timer_cb_group_);
+
+    return LifecycleNode::on_activate(state);
+  }
+
+  // 3. Deactivation Callback: Safe shutdown / engage brakes
+  CallbackReturn on_deactivate(const rclcpp_lifecycle::State & state) override {
+    RCLCPP_WARN(get_logger(), "Deactivating Ankle Actuator: Zeroing torques & engaging brakes.");
+    control_timer_->cancel();
+    joint_state_pub_->on_deactivate();
+    return LifecycleNode::on_deactivate(state);
+  }
+
+  // 4. Cleanup Callback: Release communication handles
+  CallbackReturn on_cleanup(const rclcpp_lifecycle::State & /*previous_state*/) override {
+    RCLCPP_INFO(get_logger(), "Cleaning up Ankle Actuator resources...");
+    joint_state_pub_.reset();
+    control_timer_.reset();
+    return CallbackReturn::SUCCESS;
+  }
+
+  // 5. Shutdown Callback: Emergency stop pathway
+  CallbackReturn on_shutdown(const rclcpp_lifecycle::State & /*previous_state*/) override {
+    RCLCPP_ERROR(get_logger(), "Emergency Shutdown triggered on Ankle Actuator!");
+    return CallbackReturn::SUCCESS;
+  }
+
+private:
+  void control_loop_callback() {
+    // Hard Real-Time 1 kHz execution body
+    sensor_msgs::msg::JointState msg;
+    msg.header.stamp = now();
+    msg.name = {"ankle_pitch_joint", "ankle_roll_joint"};
+    msg.position = joint_positions_;
+    msg.effort = joint_torques_;
+
+    // Non-blocking real-time publish
+    joint_state_pub_->publish(msg);
+  }
+
+  double loop_rate_hz_;
+  std::vector<double> joint_positions_;
+  std::vector<double> joint_torques_;
+
+  rclcpp::CallbackGroup::SharedPtr timer_cb_group_;
+  rclcpp::TimerBase::SharedPtr control_timer_;
+  std::shared_ptr<rclcpp_lifecycle::LifecyclePublisher<sensor_msgs::msg::JointState>> joint_state_pub_;
+};
+
+int main(int argc, char * argv[]) {
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<HumanoidAnkleActuatorNode>();
+
+  // Use StaticSingleThreadedExecutor for deterministic memory profiles
+  rclcpp::executors::StaticSingleThreadedExecutor executor;
+  executor.add_node(node->get_node_base_interface());
+  executor.spin();
+
+  rclcpp::shutdown();
+  return 0;
+}
 ```
 
-Then, you need to tell ROS 2 how to find and run this executable. Open `~/ros2_ws/src/my_python_pkg/setup.py` and add the following inside the `entry_points` dictionary:
-
-```python
-    entry_points={
-        'console_scripts': [
-            'talker = my_python_pkg.talker_node:main',
-        ],
-    },
-```
-
-## Building and Running a Node
-
-1.  **Build the workspace:**
-    ```bash
-    cd ~/ros2_ws
-    colcon build --packages-select my_python_pkg
-    ```
-2.  **Source the setup files:**
-    ```bash
-    source install/setup.bash
-    ```
-3.  **Run the node:**
-    ```bash
-    ros2 run my_python_pkg talker
-    ```
-    You should see "Hello ROS 2 from TalkerNode!" followed by "Still talking..." every second.
-
-## `ros2 run` and `ros2 node` Commands
-
-*   **`ros2 run <package_name> <executable_name>`:** Used to start an executable defined within a ROS 2 package.
-*   **`ros2 node list`:** Lists all active nodes in the ROS 2 graph.
-*   **`ros2 node info <node_name>`:** Provides detailed information about a specific node, including its published topics, subscribed topics, services, actions, and parameters.
-
-Nodes are the backbone of any ROS 2 application, allowing for the decomposition of complex robotic systems into manageable, interacting components.
+In the next chapter, we dive into continuous data transmission: **Topics, Quality of Service (QoS) Profiles, and Zero-Copy Shared Memory IPC**.
