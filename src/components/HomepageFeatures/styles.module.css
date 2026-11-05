@@ -1,25 +1,152 @@
-/* .features {
-  display: flex;
-  align-items: center;
-  padding: 2rem 0;
-  width: 100%;
-}
+/* =========================================================
+   HomepageFeatures — Sleek Modern Card Layout
+   ========================================================= */
 
-.featureSvg {
-  height: 200px;
-  width: 200px;
-}
-
-.featureCard {
-  margin-bottom: 2rem;
-} */
 .features {
-  display: flex;
-  align-items: center;
-  padding: 2rem 0;
-  width: 100%;
+  padding: 6.5rem 1.5rem;
+  background: var(--ifm-background-color);
+  border-bottom: 1px solid var(--surface-border);
 }
 
+/* Section header */
+.sectionTitle {
+  text-align: center;
+  font-size: clamp(1.8rem, 3.2vw, 2.5rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-bottom: 0.5rem;
+}
+
+.sectionSubtitle {
+  text-align: center;
+  color: var(--ifm-font-color-secondary);
+  font-size: 1.05rem;
+  max-width: 580px;
+  margin: 0.5rem auto 3.5rem;
+  line-height: 1.6;
+}
+
+/* Card wrapper */
 .featureCard {
   margin-bottom: 2rem;
+  display: flex;
+}
+
+/* The actual card */
+.card {
+  background: var(--surface-elevated);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  padding: 2.25rem;
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-shadow: var(--shadow-card);
+  transition: all var(--transition-normal);
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(99, 102, 241, 0.35);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Card top bar */
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+
+/* Badge */
+.cardBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ifm-color-primary);
+  background: var(--ifm-color-primary-lightest);
+}
+
+[data-theme='dark'] .cardBadge {
+  background: rgba(99, 102, 241, 0.15);
+}
+
+/* Icon */
+.cardIcon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+/* Title */
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.75rem;
+  color: var(--ifm-font-color-base);
+  line-height: 1.35;
+}
+
+/* Description */
+.cardDesc {
+  font-size: 0.95rem;
+  color: var(--ifm-font-color-secondary);
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  flex-grow: 1;
+}
+
+/* Checklist / pills */
+.cardBullets {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.75rem 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.cardBulletItem {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--ifm-font-color-secondary);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--surface-border);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Footer / CTA */
+.cardFooter {
+  margin-top: auto;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--surface-border);
+}
+
+.cardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--ifm-color-primary);
+  text-decoration: none !important;
+  transition: gap var(--transition-fast);
+}
+
+.cardLink:hover {
+  color: var(--ifm-color-primary-dark);
+  gap: 0.65rem;
 }
