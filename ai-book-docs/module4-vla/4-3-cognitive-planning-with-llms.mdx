@@ -1,124 +1,230 @@
 ---
 sidebar_position: 3
+title: "Cognitive Planning & Grounding with Large Language Models"
+description: "High-level cognitive planning for humanoid robots: resolving the physical grounding problem, SayCan affordance scoring, Code-as-Policies, dynamic Behavior Tree synthesis, and closed-loop error recovery."
 ---
 
-## Cognitive Planning with LLMs
+# Cognitive Planning & Grounding with Large Language Models
 
-The previous section demonstrated how Large Language Models (LLMs) can be used to extract intent and break down high-level commands into a structured sequence of tasks. This section dives deeper into **Cognitive Planning with LLMs**, focusing on how these abstract task breakdowns are translated into concrete, executable ROS 2 actions for a robot, and the critical importance of safety layers.
+Frontier Large Language Models (LLMs) such as GPT-4o, Claude 3.5 Sonnet, and Gemini 1.5 Pro possess vast semantic reasoning and commonsense knowledge. They know that dirty dishes belong in the dishwasher, that milk cartons must be refrigerated, and that wine glasses are fragile.
 
-### Translating Commands into ROS 2 Actions
+However, deploying an unconstrained LLM as a physical robot controller introduces the notorious **Symbol Grounding Problem**:
+1. **Hallucination of Physical Affordances**: An LLM might instruct a humanoid to `"Pick up the refrigerator and move it to the living room"`, oblivious to payload limits (e.g., a 15 kg maximum payload for Unitree H1 or Figure 02).
+2. **Ignorance of Spatial Geometry**: An LLM might plan to place an object on a table that is already physically occluded or out of kinematic reach.
+3. **Open-Loop Execution Fragility**: If an object slips from the robot's fingers during a grasp, a static LLM plan continues executing subsequent steps, pouring air from an empty hand.
 
-For a robot to execute an LLM-generated plan, each high-level action in the plan (e.g., `navigate_to_location`, `pick_up_object`) must correspond to a low-level capability the robot possesses. In ROS 2, these capabilities are often exposed through **Action Servers**.
+Solving these challenges requires **Physical Grounding, Affordance Verification, and Closed-Loop Reflection**.
 
-An **Action Server** provides a goal-based interface for long-running, cancellable robot tasks. For example:
-*   A `NavigateToPose` action server would handle the robot moving to a specific (x, y, theta) location.
-*   A `GraspObject` action server would manage the sequence of movements required to approach, grasp, and lift an object.
-*   A `DetectObject` action server might handle waiting for a specific object to appear in the camera feed.
+---
 
-The role of the cognitive planner is to map the LLM's output (e.g., the JSON task graph from the previous section) to the available ROS 2 Action Servers. This typically involves:
+## 1. Grounding Architectures: SayCan and Code as Policies
 
-1.  **Parsing LLM Output**: Extracting the `action` type and its `parameters` from the LLM's structured response.
-2.  **Action Goal Construction**: Creating an instance of the appropriate ROS 2 action goal message type (e.g., `NavigateToPose.Goal`, `GraspObject.Goal`) and populating its fields with the extracted parameters.
-3.  **Action Client Interaction**: Using a ROS 2 Action Client to send the goal to the corresponding Action Server. The client can then monitor the progress of the action and receive results or feedback.
+Modern cognitive architectures bridge the gap between abstract tokens and physical reality using two dominant methodologies:
 
-### Example: "Pick up the cup" → Planning Steps
+```mermaid
+flowchart TD
+    subgraph Inputs ["Multimodal Inputs"]
+        UserGoal["User Goal: 'Clean the spilled juice'"]
+        SceneGraph["3D Semantic Scene Graph (Objects, Poses, States)"]
+        RobotState["Kinematic Limits, Payload, Battery, Hand Status"]
+    end
 
-Let's break down the command "Pick up the cup" into a sequence of ROS 2 actions, assuming a pre-trained LLM provides the high-level plan and an object detection system (like Isaac ROS DetectNet) can locate the cup.
+    subgraph SayCanEngine ["SayCan Grounded Selection"]
+        LLMSemantic["LLM Prior P_LLM(a | instruction)<br/>'What is semantically useful?'"]
+        AffordanceVal["Affordance Value P_value(a | state)<br/>'What is physically possible right now?'"]
+        Scorer["Joint Scoring: argmax [log P_LLM + log P_value]"]
+    end
 
-**High-Level Goal**: Pick up the cup.
+    subgraph ExecutionTree ["Dynamic Execution Engine"]
+        BT["Synthesized Behavior Tree / ROS 2 Action Sequence"]
+        ActionServer["ROS 2 Action Clients (Nav2, MoveIt 2, Grasp)"]
+        ExecutionMonitor["Execution Monitor (FT Sensors, Cameras)"]
+    end
 
-**LLM-generated Task Breakdown (Conceptual)**:
+    subgraph ErrorReflection ["Closed-Loop Reflection Loop"]
+        FailureDetect{"Execution Failed?"}
+        ReflectionEngine["LLM Error Diagnostician<br/>'Why did the grasp fail?'"]
+    end
 
-```json
-[
-  {"action": "find_object", "object_type": "cup"},
-  {"action": "navigate_to_object", "object_type": "cup"},
-  {"action": "grasp_object", "object_type": "cup"},
-  {"action": "lift_object"}
-]
+    UserGoal --> LLMSemantic
+    SceneGraph --> AffordanceVal
+    RobotState --> AffordanceVal
+    LLMSemantic --> Scorer
+    AffordanceVal --> Scorer
+    Scorer --> BT
+    BT --> ActionServer
+    ActionServer --> ExecutionMonitor
+    ExecutionMonitor --> FailureDetect
+    FailureDetect -- Yes --> ReflectionEngine
+    ReflectionEngine -->|Updated Scene State| LLMSemantic
+    FailureDetect -- No --> NextAction["Proceed to Next Subtask"]
 ```
 
-**Translation to ROS 2 Actions (Python pseudocode)**:
+### The SayCan Formulation (Ahn et al., Google Research)
+SayCan decouples planning into two distinct probabilities:
+1. **LLM Probability `P_LLM(a | i)`**: How probable is action `a` given the user's high-level instruction `i`?
+2. **Affordance Probability `P_affordance(a | s)`**: How physically feasible is action `a` given the current world state `s`?
+
+The optimal next action $a^*$ is selected by maximizing their product:
+
+```text
+a^* = argmax_{a in A} [ log P_{LLM}(a | i) + log P_{affordance}(a | s) ]
+```
+
+Where:
+- If the instruction is `"I spilled my drink"`, the LLM assigns high scores to `find_sponge`, `vacuum_floor`, and `call_waiter`.
+- If the robot's camera observes a sponge on the table 2 meters away, but no vacuum cleaner in the building, the perception system assigns:
+  ```text
+  P_affordance(find_sponge | s) = 0.95
+  P_affordance(vacuum_floor | s) = 0.00
+  ```
+- The combined argmax immediately filters out impossible actions without fine-tuning the LLM weights.
+
+---
+
+## 2. Dynamic Behavior Tree Generation
+
+Rather than executing a rigid list of sequential steps, robust cognitive planners generate **Behavior Trees (BTs)**. Behavior Trees inherently support preemption, fallback conditions, and reactive recovery loops.
+
+```mermaid
+graph TD
+    Root["Root: Fallback (?)"]
+    GoalCondition["Condition: Spilled Juice Cleaned?"]
+    SequenceTask["Sequence (->)"]
+    
+    Sub1["Sequence: Fetch Towel (->)"]
+    NavTowel["Action: Navigate to Kitchen Cabinet"]
+    OpenCab["Action: Open Cabinet Door"]
+    GraspTowel["Action: Grasp Paper Towel"]
+    
+    Sub2["Sequence: Wipe Spill (->)"]
+    NavSpill["Action: Navigate to Spill Coordinate"]
+    WipeSurface["Action: Execute Spiral Wipe Pattern"]
+    
+    Root --> GoalCondition
+    Root --> SequenceTask
+    SequenceTask --> Sub1
+    Sub1 --> NavTowel
+    Sub1 --> OpenCab
+    Sub1 --> GraspTowel
+    SequenceTask --> Sub2
+    Sub2 --> NavSpill
+    Sub2 --> WipeSurface
+```
+
+If the humanoid drops the towel mid-transit, the `GoalCondition` evaluates to `FAILURE`, the fallback branch activates, and the robot re-executes `GraspTowel` without needing human intervention.
+
+---
+
+## 3. Code as Policies (CaP): Generating Executable Python Logic
+
+Pioneered by Liang et al., **Code as Policies** prompts code-generating LLMs to output parameterized Python code that directly interfaces with the robot's ROS 2 API:
 
 ```python
 import rclpy
-from rclpy.action import ActionClient
-from my_robot_interfaces.action import FindObject, NavigateToPose, GraspObject, LiftObject # Custom ROS 2 Actions
+from humanoid_control_api import HumanoidRobot
 
-class CognitivePlanner:
-    def __init__(self):
-        self.node = rclpy.create_node('cognitive_planner')
-        self.find_object_client = ActionClient(self.node, FindObject, 'find_object_action')
-        self.navigate_client = ActionClient(self.node, NavigateToPose, 'navigate_to_pose_action')
-        self.grasp_client = ActionClient(self.node, GraspObject, 'grasp_object_action')
-        self.lift_client = ActionClient(self.node, LiftObject, 'lift_object_action')
-        # ... other clients
+def execute_autonomous_cleaning(robot: HumanoidRobot):
+    """
+    LLM-Generated Execution Script for: 'Clear the table of all empty soda cans'
+    """
+    # 1. Perception query to 3D Scene Graph
+    objects = robot.perception.get_detected_objects()
+    soda_cans = [obj for obj in objects if "soda_can" in obj.label and obj.is_empty]
+    
+    if not soda_cans:
+        robot.speech.say("No empty soda cans found on the table.")
+        return
 
-    async def execute_llm_plan(self, llm_plan_json):
-        for step in llm_plan_json:
-            action_type = step["action"]
-            params = step.get("parameters", {})
+    robot.speech.say(f"Found {len(soda_cans)} empty cans. Starting cleanup.")
 
-            if action_type == "find_object":
-                goal = FindObject.Goal()
-                goal.object_type = params["object_type"]
-                # Send goal and await result (object_pose)
-                # If found, proceed, else handle failure
-                self.node.get_logger().info(f"Finding {goal.object_type}...")
-                await self.find_object_client.wait_for_server()
-                future = self.find_object_client.send_goal_async(goal)
-                response = await future.result()
-                if response.accepted:
-                    self.node.get_logger().info(f"Found {goal.object_type} at {response.result.object_pose}")
-                    object_pose_to_grasp = response.result.object_pose # Store for next step
-                else:
-                    self.node.get_logger().error(f"Failed to find {goal.object_type}")
-                    return False # Plan failed
-            elif action_type == "navigate_to_object":
-                # Assuming object_pose_to_grasp is available
-                goal = NavigateToPose.Goal()
-                goal.pose = object_pose_to_grasp # Use detected pose
-                # Send goal and await result
-                self.node.get_logger().info(f"Navigating to object...")
-                await self.navigate_client.wait_for_server()
-                future = self.navigate_client.send_goal_async(goal)
-                response = await future.result()
-                if not response.accepted:
-                    self.node.get_logger().error(f"Failed to navigate")
-                    return False
-            # ... similar logic for grasp_object and lift_object
-        return True # Plan executed successfully
+    for can in soda_cans:
+        # Spatial feasibility check
+        if not robot.kinematics.is_reachable(can.pose):
+            # Step closer using Nav2 footstep planner
+            robot.locomotion.step_to_approach(can.pose)
+        
+        # Dual-arm grasp selection based on object position relative to robot midline
+        arm = "left_arm" if can.pose.position.y > 0 else "right_arm"
+        
+        success = robot.manipulation.pick(
+            target_pose=can.pose, 
+            arm=arm, 
+            grasp_width_m=0.065
+        )
+        
+        if not success:
+            robot.speech.say("Grasp failed, re-evaluating grasp angle.")
+            continue
+            
+        # Navigate to recycling bin
+        robot.locomotion.navigate_to_named_pose("recycling_station")
+        robot.manipulation.place(target_location="bin_opening", arm=arm)
 
-# if __name__ == '__main__':
-#     rclpy.init()
-#     planner = CognitivePlanner()
-#     # Example LLM output
-#     llm_plan = [{"action": "find_object", "object_type": "cup"}, 
-#                 {"action": "navigate_to_object"}, 
-#                 {"action": "grasp_object"}, 
-#                 {"action": "lift_object"}]
-#     rclpy.spin_until_future_complete(planner.node, planner.execute_llm_plan(llm_plan))
-#     rclpy.shutdown()
+    robot.speech.say("Cleanup task completed.")
 ```
 
-### Safety Layers & Verification
+---
 
-Directly translating LLM outputs into robot actions without careful consideration is extremely risky. LLMs can "hallucinate," generate unsafe commands, or misinterpret context. Therefore, robust **safety layers and verification mechanisms** are paramount.
+## 4. Closed-Loop Error Recovery & Environmental Reflection
 
-Key strategies include:
+When physical execution deviates from expectations, an intelligent robot does not crash. It performs **Environmental Reflection**:
 
-*   **Semantic Parsing & Validation**:
-    *   **Schema Enforcement**: Ensure the LLM always outputs commands in a predefined structured format (e.g., JSON schema). Reject any output that doesn't conform.
-    *   **Parameter Validation**: Verify that the parameters for each action are valid (e.g., a "speed" parameter is within safe limits, a "location" is reachable).
-*   **Feasibility Checks**:
-    *   Before executing an action, check if it's physically possible and safe given the robot's current state and environment. Can the robot reach that object? Is the path clear?
-    *   This involves querying the robot's perception system and internal state.
-*   **Human-in-the-Loop**:
-    *   For critical or ambiguous commands, prompt the human user for confirmation or clarification. "Did you mean the red cup on the left or the right?"
-    *   Allow for an "emergency stop" or "override" mechanism at any point.
-*   **Guardrails & Constraints**:
-    *   Hard-code safety limits (e.g., maximum joint velocities, force limits).
-    *   Provide the LLM with "negative examples" or explicit instructions on what *not* to do.
-    *   Use techniques like **Reinforcement Learning from Human Feedback (RLHF)** to fine-tune the LLM to prioritize safety.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Robot as Humanoid Controller
+    participant Sens as Wrist Force/Torque & Cameras
+    participant Reflector as LLM Reflection Engine
+    participant Memory as Episodic Experience Buffer
 
-By carefully designing these verification steps, we can harness the powerful cognitive abilities of LLMs while ensuring our humanoid robots operate safely and reliably in the real world.
+    Robot->>Sens: Close gripper around mug
+    Sens-->>Robot: Gripper closed to 0 mm (Encoder feedback)
+    Sens-->>Robot: Measured Wrench: 0.05 N (FT sensor reads no load)
+    Robot->>Reflector: Report Failure: "Pick(mug) failed: Gripper fully closed with no force detected."
+    Reflector->>Reflector: Deduce cause: "Mug slipped or moved during approach."
+    Reflector->>Robot: Updated Strategy: "Step 1: Open gripper. Step 2: Trigger re-detection. Step 3: Shift grasp point 2cm deeper."
+    Robot->>Robot: Re-execute grasp with new offset
+    Sens-->>Robot: Measured Wrench: 4.8 N (Stable grasp confirmed!)
+    Robot->>Memory: Store successful recovery trajectory for future in-context retrieval
+```
+
+### Prompt Engineering for Cognitive Reflection
+```python
+REFLECTION_PROMPT = """
+You are the failure analysis engine of a humanoid robot.
+Action Executed: {action_name}
+Target: {target_object}
+Expected Outcome: {expected_outcome}
+Sensor Discrepancy: {sensor_data}
+
+Analyze why the failure occurred in physical space.
+Provide an updated JSON corrective sub-plan using only available primitives:
+[RE_DETECT, ADJUST_GRASP_DEPTH, BACK_OFF_AND_RETRY, ABORT_WITH_WARNING]
+"""
+```
+
+---
+
+## 5. Formal Safety Verification Layer
+
+Because LLMs are non-deterministic, industry-standard architectures (such as those employed by Boston Dynamics, Tesla, and Figure) never connect LLM outputs directly to physical joint inverters. 
+
+All generated plans pass through an **Invariant Safety Filter**:
+
+```text
+Safety Invariants:
+1. Max End-Effector Velocity:  ||v_ee|| <= 0.5 m/s
+2. Max Torso Pitch Angle:      |theta_pitch| <= 15 degrees
+3. Zero-Moment Point Margin:   ZMP in S_support_polygon
+4. Kinetic Energy Budget:      E_k <= 120 Joules
+5. Keep-Out Zones:             d(arm, head) >= 0.15 m
+```
+
+If an LLM hallucinates an aggressive motion that violates any of these physical invariants, the Safety Filter clamps the command, decelerates the robot to a controlled standing stop, and demands replanning.
+
+---
+
+## Summary
+
+Cognitive planning with LLMs transforms humanoid robots from pre-programmed automations into adaptable agents. By combining high-level semantic reasoning with **SayCan affordance grounding**, **dynamic Behavior Trees**, **Code-as-Policies execution**, and **formal invariant safety shields**, robotics engineers achieve the optimal compromise between open-world intelligence and absolute physical safety.
