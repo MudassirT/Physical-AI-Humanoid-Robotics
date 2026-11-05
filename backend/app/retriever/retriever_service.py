@@ -1,7 +1,9 @@
 from qdrant_client import QdrantClient
+
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.services.embedding import EmbeddingGenerator
+
 from ..schemas.chat_models import ContentChunk
 
 logger = get_logger(__name__)
@@ -42,6 +44,7 @@ class RetrieverService:
         return QdrantClient(
             url=qdrant_url,
             api_key=qdrant_api_key,
+            check_compatibility=False,
         )
 
     def _get_query_embedding(self, text: str) -> list[float] | None:
@@ -100,16 +103,16 @@ class RetrieverService:
             return []
 
         retrieved_chunks: list[ContentChunk] = []
-        for hit in search_result:
-            payload = hit.payload
-            if payload:
-                chunk = ContentChunk(
-                    chunk_id=str(hit.id),
-                    source_url=payload.get("source_url", "unknown"),
-                    original_text=payload.get("text", "unknown"),
-                    score=hit.score,
-                )
-                retrieved_chunks.append(chunk)
+        points = getattr(search_result, "points", search_result)
+        for hit in points:
+            payload = hit.payload or {}
+            chunk = ContentChunk(
+                chunk_id=str(hit.id),
+                source_url=payload.get("source_url", "unknown"),
+                original_text=payload.get("text", "unknown"),
+                score=hit.score,
+            )
+            retrieved_chunks.append(chunk)
 
         logger.info(
             f"RetrieverService: retrieved {len(retrieved_chunks)} chunks "

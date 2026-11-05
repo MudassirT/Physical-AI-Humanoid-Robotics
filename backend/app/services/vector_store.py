@@ -1,16 +1,19 @@
-from qdrant_client import QdrantClient, models
-from app.core.config import settings
-from app.models.models import Document
 from typing import List
+
+from qdrant_client import QdrantClient, models
+
+from app.core.config import settings
 from app.core.logging import get_logger
+from app.models.models import Document
 
 logger = get_logger(__name__)
 
 class VectorStore:
     def __init__(self):
         self.client = QdrantClient(
-            url=settings.QDRANT_URL, 
-            api_key=settings.QDRANT_API_KEY
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            check_compatibility=False,
         )
         self.collection_name = settings.COLLECTION_NAME
 
