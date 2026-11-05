@@ -1,131 +1,167 @@
 ---
 sidebar_position: 5
+title: "Hands-On Project: Biped Simulation & Stability"
 ---
 
-## Hands-On Exercises
+# Hands-On Project: Biped Simulation & Stability
 
-Theory is important, but robotics is a hands-on discipline. In this section, we will apply the concepts we've learned to build and interact with our digital twin. These exercises will require you to have ROS 2, Gazebo, and the `gazebo_ros_pkgs` installed.
+In this capstone lab for Module 2, you will construct a parametric bipedal humanoid lower chassis, configure its multi-body inertial properties and joint limits in Xacro, launch the model inside **Gazebo Harmonic**, and implement a closed-loop PD balance controller using `ros2_control`.
 
-### Exercise 1: Spawn a Humanoid from URDF into Gazebo
-
-**Objective**: To understand the process of taking a robot description file and bringing the robot to life in the Gazebo simulator.
-
-**You will need**:
-*   A sample URDF file for a simple humanoid robot. For this exercise, you can use a pre-existing model like the `iRobot-Create-URDF` or a simple custom biped model. (A sample file `simple_biped.urdf` should be provided alongside this course material).
-*   A Gazebo world file. An empty world is sufficient.
-
-**Steps**:
-
-1.  **Create a Launch File**: In your ROS 2 package, create a Python launch file (e.g., `spawn_humanoid.launch.py`). This file will automate the process of starting Gazebo and spawning the robot.
-
-2.  **Include the Gazebo Executable**: Your launch file should first start the Gazebo server (`gzserver`) and client (`gzclient`). You can use the `ExecuteProcess` action from `launch.actions` to do this.
-
-    ```python
-    # Inside your launch file
-    gazebo = ExecuteProcess(
-        cmd=['gazebo', '--verbose', '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so', world_path],
-        output='screen'
-    )
-    ```
-
-3.  **Read the URDF File**: Your launch file needs to locate and read the contents of your `simple_biped.urdf` file.
-
-4.  **Define the Spawner Node**: The key to spawning the robot is the `spawn_entity.py` script provided by `gazebo_ros`. You will create a `Node` action in your launch file that runs this script.
-
-    ```python
-    # The spawner node
-    spawn_entity = Node(
-        package='gazebo_ros',
-        executable='spawn_entity.py',
-        arguments=[
-            '-topic', 'robot_description',
-            '-entity', 'simple_biped',
-            '-x', '0.0',
-            '-y', '0.0',
-            '-z', '1.0'
-        ],
-        output='screen'
-    )
-    ```
-    This node tells Gazebo to listen to the `/robot_description` topic for the robot's model and spawn an entity named `simple_biped` at a height of 1.0 meter.
-
-5.  **Publish the Robot Description**: You need a `robot_state_publisher` node that reads the URDF and publishes it to the `/robot_description` topic.
-
-6.  **Launch and Observe**: Run your launch file using `ros2 launch <your_package> spawn_humanoid.launch.py`. You should see Gazebo open, and after a moment, your humanoid model will appear and likely fall over due to gravity, demonstrating that the physics engine is active.
-
-**Success Criteria**: The humanoid robot model appears in the Gazebo window at the specified coordinates.
+```mermaid
+flowchart TD
+    subgraph LabWorkflow["Hands-On Bipedal Simulation Workflow"]
+        Xacro["1. Author Modular Biped Model (humanoid_biped.urdf.xacro)"] --> InertiaCalc["2. Compute Rigid-Body Inertia Tensors (Parallel Axis Theorem)"]
+        InertiaCalc --> ControllerYAML["3. Configure ros2_control YAML Gains (Kp, Kd, Effort Limits)"]
+        ControllerYAML --> LaunchSim["4. Execute Gazebo Harmonic Launch Orchestrator"]
+        LaunchSim --> VerifyBalance["5. Apply 100 N Impulse Push Test to Verify Dynamic Recovery"]
+    end
+```
 
 ---
 
-### Exercise 2: Simulate a Room with LiDAR + IMU
+## 1. Parametric Bipedal Kinematic Model (`humanoid_biped.urdf.xacro`)
 
-**Objective**: To build a simple test environment and simulate sensor data that can be visualized in ROS 2.
+Create the master robot description file inside your `humanoid_description` package:
 
-**Steps**:
+```xml
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="humanoid_biped">
 
-1.  **Create a World SDF File**: Create a new file named `test_room.world`. In this file, use SDF to define a ground plane and four simple walls to form a box.
+  <!-- Physical constants -->
+  <xacro:property name="pelvis_mass" value="12.0" />
+  <xacro:property name="thigh_mass" value="4.5" />
+  <xacro:property name="shank_mass" value="3.2" />
+  <xacro:property name="foot_mass" value="1.2" />
 
-    ```xml
-    <!-- Abridged example for test_room.world -->
-    <sdf version='1.7'>
-      <world name='default'>
-        <include>
-          <uri>model://ground_plane</uri>
-        </include>
-        <model name='walls'>
-          <!-- Define walls using <link> and <collision>/<visual> tags -->
-        </model>
-      </world>
-    </sdf>
-    ```
+  <xacro:property name="thigh_length" value="0.40" />
+  <xacro:property name="shank_length" value="0.40" />
+  <xacro:property name="foot_length" value="0.22" />
+  <xacro:property name="foot_width" value="0.12" />
 
-2.  **Add Sensors to the URDF**: Modify your `simple_biped.urdf` file to include plugins for a LiDAR sensor and an IMU sensor. Attach them to relevant links, like the `head` or `torso`.
+  <!-- Pelvis Floating Base Link -->
+  <link name="pelvis_link">
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${pelvis_mass}"/>
+      <inertia ixx="0.08" ixy="0.0" ixz="0.0" iyy="0.09" iyz="0.0" izz="0.05"/>
+    </inertial>
+    <visual>
+      <geometry><box size="0.20 0.28 0.16"/></geometry>
+      <material name="slate_dark"><color rgba="0.15 0.18 0.25 1.0"/></material>
+    </visual>
+    <collision>
+      <geometry><box size="0.20 0.28 0.16"/></geometry>
+    </collision>
+  </link>
 
-    ```xml
-    <!-- Abridged example for URDF -->
-    <gazebo reference="torso_link">
-      <sensor name="imu_sensor" type="imu">
-        <plugin name="imu_plugin" filename="libgazebo_ros_imu_sensor.so">
-          <!-- ROS 2 parameters for topic name, frame, etc. -->
-        </plugin>
-      </sensor>
-    </gazebo>
+  <!-- Macro for Bipedal Leg (Left and Right) -->
+  <xacro:macro name="humanoid_leg" params="prefix reflect">
+    <!-- Hip Yaw Joint -->
+    <joint name="${prefix}_hip_yaw_joint" type="revolute">
+      <parent link="pelvis_link"/>
+      <child link="${prefix}_hip_link"/>
+      <origin xyz="0.0 ${reflect * 0.10} -0.08" rpy="0 0 0"/>
+      <axis xyz="0 0 1"/>
+      <limit lower="-0.6" upper="0.6" effort="120" velocity="6.0"/>
+    </joint>
 
-    <gazebo reference="head_link">
-      <sensor name="lidar" type="ray">
-        <plugin name="lidar_plugin" filename="libgazebo_ros_ray_sensor.so">
-          <!-- ROS 2 parameters for topic name, etc. -->
-        </plugin>
-        <!-- LiDAR-specific configuration for range, samples, etc. -->
-      </sensor>
-    </gazebo>
-    ```
+    <link name="${prefix}_hip_link">
+      <inertial>
+        <mass value="1.8"/>
+        <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>
+      </inertial>
+    </link>
 
-3.  **Update the Launch File**: Modify your launch file to load your new `test_room.world` instead of an empty world.
+    <!-- Knee Pitch Joint -->
+    <joint name="${prefix}_knee_pitch_joint" type="revolute">
+      <parent link="${prefix}_hip_link"/>
+      <child link="${prefix}_shank_link"/>
+      <origin xyz="0.0 0.0 -${thigh_length}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="0.0" upper="2.1" effort="200" velocity="8.0"/>
+    </joint>
 
-4.  **Launch the Simulation**: Run your updated launch file. Your biped should now spawn inside the room you created.
+    <link name="${prefix}_shank_link">
+      <inertial>
+        <origin xyz="0 0 -${shank_length/2}" rpy="0 0 0"/>
+        <mass value="${shank_mass}"/>
+        <inertia ixx="0.04" ixy="0" ixz="0" iyy="0.04" iyz="0" izz="0.006"/>
+      </inertial>
+      <visual>
+        <origin xyz="0 0 -${shank_length/2}"/>
+        <geometry><cylinder radius="0.04" length="${shank_length}"/></geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 -${shank_length/2}"/>
+        <geometry><cylinder radius="0.04" length="${shank_length}"/></geometry>
+      </collision>
+    </link>
 
-5.  **Visualize the Data**:
-    *   **LiDAR**: Open RViz2 (`ros2 run rviz2 rviz2`). Add a `LaserScan` display and set the topic to your LiDAR's topic (e.g., `/scan`). You should see red points indicating where the LiDAR beams are hitting the walls of your room.
-    *   **IMU**: In a new terminal, use `ros2 topic echo` to view the raw data from your IMU topic (e.g., `/imu/data`).
+    <!-- Ankle Pitch & Foot -->
+    <joint name="${prefix}_ankle_pitch_joint" type="revolute">
+      <parent link="${prefix}_shank_link"/>
+      <child link="${prefix}_foot_link"/>
+      <origin xyz="0 0 -${shank_length}" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <limit lower="-0.8" upper="0.8" effort="150" velocity="8.0"/>
+    </joint>
 
-**Success Criteria**: The robot spawns in the enclosed room, and you can successfully visualize the LiDAR data in RViz2 and echo the IMU data on the console.
+    <link name="${prefix}_foot_link">
+      <inertial>
+        <origin xyz="0.04 0 -0.03" rpy="0 0 0"/>
+        <mass value="${foot_mass}"/>
+        <inertia ixx="0.003" ixy="0" ixz="0" iyy="0.008" iyz="0" izz="0.008"/>
+      </inertial>
+      <visual>
+        <origin xyz="0.04 0 -0.03"/>
+        <geometry><box size="${foot_length} ${foot_width} 0.06"/></geometry>
+      </visual>
+      <collision>
+        <origin xyz="0.04 0 -0.03"/>
+        <geometry><box size="${foot_length} ${foot_width} 0.06"/></geometry>
+      </collision>
+    </link>
+  </xacro:macro>
+
+  <!-- Instantiate Left and Right Legs -->
+  <xacro:humanoid_leg prefix="left" reflect="1" />
+  <xacro:humanoid_leg prefix="right" reflect="-1" />
+
+</robot>
+```
 
 ---
 
-### Bonus Exercise: Create a Unity Scene & Link to ROS 2
+## 2. Launching Gazebo Harmonic with `ros2_control`
 
-**Objective**: To get a feel for the Unity side of the digital twin by creating a visual scene and preparing it for ROS 2 communication.
+Execute the following commands in your development terminal:
 
-**Steps**:
+```bash
+# 1. Build workspace with symlink install
+cd ~/humanoid_ws
+colcon build --symlink-install --packages-select humanoid_description humanoid_bringup
+source install/setup.bash
 
-1.  **Set up Unity Robotics Hub**: Create a new Unity project and import the official `Unity-Robotics-Hub` package.
-2.  **Create a Simple Scene**: In Unity, create a new scene. Add a "Plane" GameObject to act as the ground. Add a few "Cube" or "Sphere" GameObjects to act as simple props. Apply materials and colors to make the scene visually distinct.
-3.  **Import Robot Model**: Import the visual meshes (`.dae` or `.fbx` files) of your humanoid robot into Unity and assemble them into a prefab.
-4.  **Add ROS 2 Connection**: Add the `ROSConnection` prefab to your scene and configure it to connect to your ROS 2 network (you may need to run the `ros2-web-bridge`).
-5.  **Next Steps (Conceptual)**:
-    *   Think about how you would write a C# script to subscribe to the `/joint_states` topic.
-    *   This script would need a reference to each of the visual links of your robot model in Unity.
-    *   In the script's `Update` function, you would parse the `JointState` message and apply the received joint angles to the `transform.rotation` of each corresponding link.
+# 2. Launch Gazebo Harmonic with physics co-simulation
+ros2 launch humanoid_bringup sim_biped_gazebo.launch.py
 
-**Success Criteria**: You have a Unity scene that can successfully connect to your ROS 2 network. When you run the scene, the Unity console shows a "Connected to ROS" message.
+# 3. Verify real-time publishing of simulated foot contact forces
+ros2 topic echo /humanoid/left_foot/wrench
+```
+
+---
+
+## 3. Dynamic Push Disturbance Verification
+
+To test whether your digital twin's contact mechanics and friction cones are correctly configured:
+1. Open a second terminal and apply a **100 N lateral impulse** for 0.1 seconds to the floating-base pelvis link:
+   ```bash
+   gz service -s /world/default/set_wrench \
+     --reqtype gz.msgs.EntityWrench \
+     --reptype gz.msgs.Boolean \
+     --timeout 1000 \
+     --req 'entity: {name: "humanoid_biped", type: MODEL}, wrench: {force: {x: 0, y: 100.0, z: 0}}'
+   ```
+2. Observe the center of mass trajectory in RViz2: The ground reaction wrenches will shift toward the lateral edge of the support polygon, demonstrating active dynamic stabilization.
+
+With the physical digital twin verified, we proceed to **Module 3: Constructing the AI-Robot Brain using NVIDIA Isaac Sim, Isaac ROS, and Nav2 Bipedal Locomotion**.
