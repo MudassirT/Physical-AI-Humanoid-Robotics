@@ -1,72 +1,267 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato&family=Montserrat:wght@700&family=Open+Sans&family=Poppins:wght@700&family=Roboto:wght@700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
 
 /**
- * Any CSS included here will be global. The classic template
- * bundles Infima by default. Infima is a CSS framework designed to
- * work well for content-centric websites.
+ * Global CSS — Physical AI & Humanoid Robotics
+ * Aesthetic, minimal, enterprise-grade design tokens.
  */
 
-/* You can override the default Infima variables here. */
+/* ============================================================
+   LIGHT MODE — Modern Minimalist Tokens
+   ============================================================ */
 :root {
-  --ifm-color-primary: #00008B; /* Dark Blue */
-  --ifm-color-primary-dark: #00005C;
-  --ifm-color-primary-darker: #000041;
-  --ifm-color-primary-darkest: #000027;
-  --ifm-color-primary-light: #3333A3;
-  --ifm-color-primary-lighter: #4C4CB5;
-  --ifm-color-primary-lightest: #dce3f8; /* used by ChatWidget bubble */
+  /* --- Brand Palette --- */
+  --ifm-color-primary: #3b49df;
+  --ifm-color-primary-dark: #2f3ab2;
+  --ifm-color-primary-darker: #29339c;
+  --ifm-color-primary-darkest: #1e2572;
+  --ifm-color-primary-light: #5865f2;
+  --ifm-color-primary-lighter: #7983f5;
+  --ifm-color-primary-lightest: #eff1fe;
 
-  --ifm-color-secondary: #0000FF; /* Blue */
-  --ifm-color-secondary-dark: #0000CC;
-  --ifm-color-secondary-darker: #0000A3;
-  --ifm-color-secondary-darkest: #00006B;
-  --ifm-color-secondary-light: #4747FF;
-  --ifm-color-secondary-lighter: #6B6BFF;
-  --ifm-color-secondary-lightest: #f0f4f8; /* used by ChatWidget agent bubble */
+  --ifm-color-secondary: #0ea5e9;
+  --ifm-color-secondary-dark: #0284c7;
+  --ifm-color-secondary-light: #38bdf8;
+  --ifm-color-secondary-lightest: #f0f9ff;
 
-  --ifm-background-color: #FFFFFF; /* White */
-  --ifm-background-surface-color: #F5F5F5; /* Light Grey */
+  /* --- Surfaces & Canvas --- */
+  --ifm-background-color: #ffffff;
+  --ifm-background-surface-color: #f8fafc;
+  --surface-elevated: #ffffff;
+  --surface-border: #e2e8f0;
+  --surface-border-subtle: #f1f5f9;
 
-  --ifm-font-color-base: #000000;
-  --ifm-font-family-base: 'Open Sans', 'Lato', sans-serif;
-  --ifm-heading-font-family: 'Roboto', 'Poppins', 'Montserrat', sans-serif;
+  /* --- Typography --- */
+  --ifm-font-color-base: #0f172a;
+  --ifm-font-color-secondary: #64748b;
+  --ifm-font-family-base: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ifm-heading-font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', monospace;
+  --ifm-heading-font-weight: 700;
+  --ifm-heading-letter-spacing: -0.025em;
 
-  --ifm-code-font-size: 95%;
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+  /* --- Radii --- */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+
+  /* --- Shadows --- */
+  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
+  --shadow-hover: 0 16px 36px -4px rgba(15, 23, 42, 0.1), 0 6px 14px -2px rgba(15, 23, 42, 0.06);
+  --shadow-glass: 0 8px 32px 0 rgba(15, 23, 42, 0.08);
+
+  /* --- Gradients --- */
+  --gradient-brand: linear-gradient(135deg, #3b49df 0%, #6366f1 100%);
+  --gradient-text: linear-gradient(135deg, #0f172a 30%, #475569 100%);
+  --gradient-hero-accent: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-normal: 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.hero--primary {
-  background: linear-gradient(45deg, var(--ifm-color-primary), var(--ifm-color-primary-light));
+/* ============================================================
+   DARK MODE — Linear/Vercel Aesthetic
+   ============================================================ */
+[data-theme='dark'] {
+  --ifm-color-primary: #6366f1;
+  --ifm-color-primary-dark: #4f46e5;
+  --ifm-color-primary-darker: #4338ca;
+  --ifm-color-primary-darkest: #3730a3;
+  --ifm-color-primary-light: #818cf8;
+  --ifm-color-primary-lighter: #a5b4fc;
+  --ifm-color-primary-lightest: #1e1b4b;
+
+  --ifm-background-color: #090a0f;
+  --ifm-background-surface-color: #0f1118;
+  --surface-elevated: #13151f;
+  --surface-border: rgba(255, 255, 255, 0.08);
+  --surface-border-subtle: rgba(255, 255, 255, 0.04);
+
+  --ifm-font-color-base: #f8fafc;
+  --ifm-font-color-secondary: #94a3b8;
+
+  --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
+  --shadow-hover: 0 16px 40px -4px rgba(0, 0, 0, 0.6), 0 8px 18px -2px rgba(0, 0, 0, 0.4);
+
+  --gradient-text: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
+  --gradient-hero-accent: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18) 0%, transparent 65%);
+}
+
+/* ============================================================
+   GLOBAL RESET & REFINEMENTS
+   ============================================================ */
+html {
+  scroll-behavior: smooth;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+body {
+  font-family: var(--ifm-font-family-base);
+  color: var(--ifm-font-color-base);
+  background-color: var(--ifm-background-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: var(--ifm-heading-font-family);
-    font-weight: 700;
+  font-family: var(--ifm-heading-font-family);
+  font-weight: var(--ifm-heading-font-weight);
+  letter-spacing: var(--ifm-heading-letter-spacing);
+  color: var(--ifm-font-color-base);
 }
 
+/* ============================================================
+   NAVBAR — Clean Glassmorphism
+   ============================================================ */
+.navbar {
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  border-bottom: 1px solid var(--surface-border);
+  box-shadow: none;
+  height: 64px;
+  padding: 0 1.5rem;
+  transition: background-color var(--transition-normal), border-color var(--transition-normal);
+}
 
-/* For readability concerns, you should choose a lighter palette in dark mode. */
-[data-theme='dark'] {
-  --ifm-color-primary: #ADD8E6; /* Light Cyan-ish */
-  --ifm-color-primary-dark: #9AC9D6;
-  --ifm-color-primary-darker: #8DC0CF;
-  --ifm-color-primary-darkest: #6CAEC3;
-  --ifm-color-primary-light: #BCE1F0;
-  --ifm-color-primary-lighter: #C6E6F2;
-  --ifm-color-primary-lightest: #1e2d3d; /* dark-mode ChatWidget user bubble */
+[data-theme='dark'] .navbar {
+  background-color: rgba(9, 10, 15, 0.75) !important;
+  border-bottom: 1px solid var(--surface-border);
+}
 
-  --ifm-color-secondary: #A9A9A9; /* Dark Grey */
-  --ifm-color-secondary-dark: #949494;
-  --ifm-color-secondary-darker: #8A8A8A;
-  --ifm-color-secondary-darkest: #707070;
-  --ifm-color-secondary-light: #BDBDBD;
-  --ifm-color-secondary-lighter: #C8C8C8;
-  --ifm-color-secondary-lightest: #1e1e2e; /* dark-mode ChatWidget agent bubble */
+.navbar__title {
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: var(--ifm-font-color-base) !important;
+}
 
-  --ifm-background-color: #121212;
-  --ifm-background-surface-color: #1E1E1E;
+.navbar__item {
+  font-weight: 500;
+  font-size: 0.92rem;
+  color: var(--ifm-font-color-secondary) !important;
+  transition: color var(--transition-fast);
+}
 
-  --ifm-font-color-base: #FFFFFF;
+.navbar__item:hover,
+.navbar__link--active {
+  color: var(--ifm-color-primary) !important;
+}
 
-  --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.3);
+/* Logo icon styling */
+.navbar__brand img {
+  border-radius: var(--radius-xs);
+  margin-right: 0.5rem;
+}
+
+/* ============================================================
+   BUTTONS — Sophisticated Micro-interactions
+   ============================================================ */
+.button {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.4rem;
+}
+
+.button--primary {
+  background: var(--ifm-color-primary) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #ffffff !important;
+  box-shadow: var(--shadow-subtle);
+}
+
+.button--primary:hover {
+  background: var(--ifm-color-primary-dark) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px -2px rgba(99, 102, 241, 0.35) !important;
+}
+
+.button--secondary {
+  background: #ffffff !important;
+  border: 1px solid var(--surface-border) !important;
+  color: var(--ifm-font-color-base) !important;
+  box-shadow: var(--shadow-subtle);
+}
+
+.button--secondary:hover {
+  background: var(--ifm-background-surface-color) !important;
+  border-color: #cbd5e1 !important;
+  color: var(--ifm-color-primary) !important;
+  transform: translateY(-1px);
+}
+
+[data-theme='dark'] .button--secondary {
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(12px);
+}
+
+[data-theme='dark'] .button--secondary:hover {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+}
+
+.button--outline {
+  border: 1px solid var(--surface-border) !important;
+  background: transparent !important;
+  color: var(--ifm-font-color-base) !important;
+}
+
+.button--outline:hover {
+  background: var(--ifm-background-surface-color) !important;
+  border-color: var(--ifm-color-primary) !important;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+.footer {
+  background-color: var(--ifm-background-surface-color) !important;
+  border-top: 1px solid var(--surface-border);
+  color: var(--ifm-font-color-secondary);
+  padding: 3.5rem 0;
+}
+
+/* ============================================================
+   SCROLLBAR
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.5);
+}
+
+/* ============================================================
+   UTILITY CLASSES
+   ============================================================ */
+.gradient-text {
+  background: var(--gradient-text);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.section-divider {
+  display: none; /* Replaced by elegant whitespace and typographic hierarchy */
 }

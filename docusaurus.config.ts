@@ -58,20 +58,29 @@ const config: Config = {
         sidebarPath: require.resolve('./ai-book-docs/sidebar.ts'),
       },
     ],
-    // Custom Webpack plugin to expose REACT_APP_FASTAPI_BASE_URL to client-side
+    // Custom Webpack/Rspack plugin to expose REACT_APP_FASTAPI_BASE_URL to client-side
     function (context, options) {
       return {
         name: 'webpack-env-plugin',
         configureWebpack(config, isServer, utils) {
           // Only apply on the client-side build
           if (!isServer) {
-            config.plugins.push(
-              new (require('webpack').DefinePlugin)({
-                'process.env.REACT_APP_FASTAPI_BASE_URL': JSON.stringify(process.env.REACT_APP_FASTAPI_BASE_URL),
-              }),
-            );
+            // Detect rspack vs webpack bundler at runtime
+            let BundlerDefinePlugin;
+            try {
+              BundlerDefinePlugin = require('@rspack/core').DefinePlugin;
+            } catch {
+              BundlerDefinePlugin = require('webpack').DefinePlugin;
+            }
+            return {
+              plugins: [
+                new BundlerDefinePlugin({
+                  'process.env.REACT_APP_FASTAPI_BASE_URL': JSON.stringify(process.env.REACT_APP_FASTAPI_BASE_URL),
+                }),
+              ],
+            };
           }
-          return config;
+          return {};
         },
       };
     },
@@ -81,7 +90,9 @@ const config: Config = {
     // Replace with your project's social card
     image: 'img/docusaurus-social-card.jpg',
     colorMode: {
-      respectPrefersColorScheme: true,
+      defaultMode: 'dark',
+      disableSwitch: false,
+      respectPrefersColorScheme: false,
     },
     navbar: {
       title: 'Physical AI & Humanoid Robotics',
@@ -91,7 +102,7 @@ const config: Config = {
               },              items: [
                 {
                   to: '/ai-book/intro',
-                  label: 'Text Book',
+                  label: 'Curriculum',
                   position: 'left',
                   activeBaseRegex: `/ai-book/`,
                   docsPluginId: 'ai-book',
