@@ -1,45 +1,39 @@
-# RAG Agent Backend
+# Physical AI & Humanoid Robotics — RAG Agent Backend
 
-FastAPI backend for the **Physical AI & Humanoid Robotics** RAG (Retrieval-Augmented Generation) system.
+FastAPI backend and autonomous Retrieval-Augmented Generation (RAG) agent powering the **Physical AI & Humanoid Robotics** interactive curriculum.
 
-The agent answers questions about the book exclusively from content stored in Qdrant, using Google Gemini's `gemini-2.0-flash` and Cohere embeddings.
+The service integrates **Google Gemini 2.5 Flash** for tool-calling reasoning, **Cohere `embed-english-v3.0`** for high-fidelity semantic embeddings, and **Qdrant Cloud** for vector similarity search.
 
 ---
 
-## 🏗️ Architecture
+## 🏗️ Architecture & Component Topology
 
 ```
 backend/
 ├── app/
-│   ├── agent/              # Google Gemini tool-calling agent
+│   ├── agent/              # Google Gemini 2.5 Flash tool-calling agent
 │   │   └── agent_service.py
-│   ├── core/               # Config & logging
-│   │   ├── config.py       # Pydantic-settings (reads .env)
-│   │   └── logging.py
-│   ├── models/             # Domain models (Document, Embedding)
-│   ├── retriever/          # Qdrant semantic retrieval
+│   ├── core/               # Configuration & Logging
+│   │   ├── config.py       # Pydantic Settings (.env management)
+│   │   └── logging.py      # Structured JSON/Console Logger
+│   ├── models/             # Core domain models (Document, Embedding)
+│   ├── retriever/          # Qdrant semantic search & point extraction
 │   │   └── retriever_service.py
-│   ├── routes/             # FastAPI routes
-│   │   └── chat.py         # /ask, /health, /retrieval-test
-│   ├── schemas/            # Pydantic request/response schemas
+│   ├── routes/             # REST API endpoints
+│   │   └── chat.py         # /ask, /heartbeat, /retrieval-test
+│   ├── schemas/            # Pydantic request/response validation
 │   │   └── chat_models.py
-│   ├── services/           # Data pipeline utilities
-│   │   ├── crawler.py
-│   │   ├── embedding.py
-│   │   ├── text_processor.py
-│   │   └── vector_store.py
-│   └── main.py             # FastAPI application entry point
-├── tests/
-│   ├── conftest.py
-│   ├── test_routes.py
-│   ├── test_agent_service.py
-│   ├── test_retriever_service.py
-│   ├── test_crawler.py
-│   ├── test_embedding.py
-│   ├── test_text_processor.py
-│   └── retrieval/          # Integration retrieval verification
-├── .env.example
-└── pyproject.toml
+│   ├── services/           # Data pipeline services
+│   │   ├── crawler.py      # MDX documentation crawler
+│   │   ├── embedding.py    # Cohere API client with retry & backoff
+│   │   ├── text_processor.py # Semantic chunking & overlap
+│   │   └── vector_store.py # Qdrant Cloud client & collection manager
+│   └── main.py             # FastAPI entry point & CORS configuration
+├── tests/                  # Pytest unit & integration suite
+├── ingest_docs.py          # Vector database ingestion script
+├── Dockerfile              # Multi-stage production container
+├── pyproject.toml          # Python package & dependency specifications
+└── .env.example            # Environment variable template
 ```
 
 ---
@@ -47,90 +41,76 @@ backend/
 ## ⚡ Quickstart
 
 ### 1. Prerequisites
+- Python 3.13+
+- [`uv`](https://docs.astral.sh/uv/) (recommended) or `pip`
+- Accounts on [Qdrant Cloud](https://qdrant.tech/), [Cohere](https://cohere.com/), and [Google AI Studio](https://aistudio.google.com/)
 
-- Python 3.13
-- [`uv`](https://docs.astral.sh/uv/) (fast Python package manager)
-- Accounts on [Qdrant Cloud](https://qdrant.tech/) and [Google AI Studio](https://aistudio.google.com/)
-
-### 2. Install dependencies
-
-```bash
-cd backend
-uv pip sync
-```
-
-### 3. Configure environment
+### 2. Environment Configuration
+Copy `.env.example` to `.env` and fill in your credentials:
 
 ```bash
 cp .env.example .env
-# Edit .env and fill in your API keys:
-#   COHERE_API_KEY=...
-#   QDRANT_API_KEY=...
-#   QDRANT_URL=...
-#   GEMINI_API_KEY=...
 ```
 
-### 4. Start the server
+| Key | Description |
+| :--- | :--- |
+| `GEMINI_API_KEY` | Google AI Studio API key (powers `gemini-2.5-flash`) |
+| `COHERE_API_KEY` | Cohere API key (generates `embed-english-v3.0` embeddings) |
+| `QDRANT_URL` | Qdrant Cloud cluster endpoint |
+| `QDRANT_API_KEY` | Qdrant Cloud read/write API key |
+| `COLLECTION_NAME`| Target Qdrant collection (default: `ragbot_embedding`) |
+
+### 3. Local Installation & Run
+```bash
+# Setup virtual environment
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Install dependencies in editable mode
+uv pip install -e .
+
+# Start development server
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Interactive API documentation will be available at:
+- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+
+---
+
+## 📚 Ingestion Pipeline
+
+To chunk and embed the entire 26-chapter curriculum into Qdrant Cloud:
 
 ```bash
-uvicorn app.main:app --reload
+python ingest_docs.py
 ```
 
-The API is now available at `http://127.0.0.1:8000`.
+This reads all `.mdx` files from `../ai-book-docs/`, splits them into semantic chunks with 50-word overlap, generates Cohere embeddings, and upserts them to the `ragbot_embedding` collection.
 
 ---
 
-## 📡 API Endpoints
+## 🧪 Testing
 
-| Method | Path               | Description                               |
-|--------|--------------------|-------------------------------------------|
-| POST   | `/ask`             | Send a question to the RAG agent          |
-| GET    | `/health`          | Service health check (`{"status":"ok"}`)  |
-| POST   | `/retrieval-test`  | Directly test Qdrant retrieval            |
-| GET    | `/heartbeat`       | Liveness probe                            |
-| GET    | `/docs`            | Interactive OpenAPI documentation         |
-
-### Example — `/ask`
+Run the automated test suite:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/ask \
-  -H "Content-Type: application/json" \
-  -d '{"query_text": "What are ROS 2 nodes?"}'
+pytest
 ```
 
-```json
-{
-  "answer_text": "ROS 2 nodes are the fundamental computing units...",
-  "retrieved_sources": ["https://your-site.com/ai-book/1-2-ros2-core-concepts"]
-}
-```
-
----
-
-## 🧪 Running Tests
+Run code formatting and linting:
 
 ```bash
-cd backend
-pytest tests/ -v
+ruff check .
 ```
 
-> **Note:** Unit tests use mocks — no API keys or running Qdrant instance required.
-
 ---
 
-## 🔧 Configuration Reference
+## 📡 API Reference
 
-| Variable          | Required | Default            | Description                       |
-|-------------------|----------|--------------------|-----------------------------------|
-| `COHERE_API_KEY`  | ✅       | —                  | Cohere API key (embeddings)       |
-| `QDRANT_API_KEY`  | ✅       | —                  | Qdrant Cloud API key              |
-| `QDRANT_URL`      | ✅       | —                  | Qdrant cluster URL                |
-| `GEMINI_API_KEY`  | ✅       | —                  | Google Gemini API key (gemini-2.0-flash) |
-| `COLLECTION_NAME` | ❌       | `ragbot_embedding` | Qdrant collection name            |
-
----
-
-## 🌐 CORS
-
-CORS is configured to allow all origins (`*`) for the hackathon demo.  
-In production, update `allow_origins` in `app/main.py` to your frontend URL.
+| Endpoint | Method | Description |
+| :--- | :---: | :--- |
+| `/heartbeat` | `GET` | Health check endpoint returning `{"status": "alive"}` |
+| `/ask` | `POST` | Primary RAG agent query endpoint. Accepts query and returns answer with citations |
+| `/retrieval-test` | `POST` | Raw semantic search verification against Qdrant without LLM synthesis |
