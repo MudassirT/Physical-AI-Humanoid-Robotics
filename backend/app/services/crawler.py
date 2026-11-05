@@ -1,6 +1,8 @@
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
+
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -48,7 +50,7 @@ class Crawler:
             response = requests.get(url)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
-            
+
             # Remove nav and footer elements
             for element in soup(['nav', 'footer']):
                 element.decompose()
@@ -58,7 +60,7 @@ class Crawler:
                 element.decompose()
 
             main_content = soup.find('article') or soup.find('main') or soup.body
-            
+
             title = soup.title.string if soup.title else "No Title"
 
             return main_content.get_text(separator='\n', strip=True), title

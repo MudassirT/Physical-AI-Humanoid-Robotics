@@ -1,4 +1,5 @@
 import cohere
+
 from app.core.config import settings
 from app.core.logging import get_logger
 
@@ -40,6 +41,6 @@ class EmbeddingGenerator:
                 input_type=input_type,
             )
             return response.embeddings
-        except cohere.CohereError as e:
+        except Exception as e:
             logger.error(f"Error generating embeddings: {e}")
             return None
