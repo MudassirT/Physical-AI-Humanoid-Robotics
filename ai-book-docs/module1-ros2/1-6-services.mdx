@@ -1,189 +1,173 @@
 ---
 sidebar_position: 6
+title: Synchronous Services & Concurrency Deadlocks
 ---
 
-# Services
+# Synchronous Services & Concurrency Deadlocks
 
-**Services** in ROS 2 provide a synchronous request/reply communication model. Unlike topics, which are designed for continuous, asynchronous data streaming, services are used when you need to send a request to a node and receive a single, immediate response. This is analogous to a function call in a traditional programming paradigm.
+While continuous data flows over Topics, discrete state transitions—such as zeroing motor encoder offsets, engaging mechanical holding brakes, or querying battery cell voltages—require a direct, synchronous Remote Procedure Call (RPC). In ROS 2, this is governed by **Services**.
 
-## Request/Reply Model
+However, in multi-threaded robotics software, naive service invocations represent the single most common cause of **deadlocks and thread starvation**. Understanding executor callback scheduling and non-blocking asynchronous promises is mandatory for humanoid systems engineering.
 
-*   **Service Server:** A node that "advertises" a service and waits for incoming requests. When a request is received, the server executes a defined callback function to process the request and generate a response.
-*   **Service Client:** A node that "calls" a service on a server, sending a request message and blocking (or awaiting asynchronously) until it receives a response message.
-*   **Service Name:** A unique string identifier for the service (e.g., `/get_robot_pose`, `/set_gripper_state`).
-*   **Service Definition:** Defined by `.srv` files, which explicitly define the structure of both the request and response messages. A `---` separates the request fields from the response fields.
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as Humanoid Supervisor Node
+    participant DDS as DDS RPC Wire Transport
+    participant Server as Motor Controller Service Server
+    participant Motor as Physical BLDC Drivers
 
-## Creating a Service (Python Example)
-
-Let's create a simple service that adds two integers.
-
-### Define the Service (`AddTwoInts.srv`)
-
-First, create a `srv` directory inside `~/ros2_ws/src/my_python_pkg` (if it doesn't exist) and then `AddTwoInts.srv`:
-
+    Client->>DDS: Send Service Request: CalibrateZeroOffsets(joint_mask=0x0F)
+    DDS->>Server: Dispatch Request Callback
+    Note over Server: Verify Actuator Current = 0.0 A (Safety Interlock)
+    Server->>Motor: Engage index-pulse calibration routine
+    Motor-->>Server: Index pulses verified; optical home set
+    Server->>DDS: Return Response: {success: true, calibrated_joints: 4}
+    DDS->>Client: Resolve std::future / Trigger Async Callback
+    Note over Client: Transition state machine to "Ready to Walk"
 ```
-int64 a
-int64 b
+
 ---
-int64 sum
+
+## 1. The Anatomy of a ROS 2 Service
+
+A service consists of a strictly paired Request and Response data structure defined in a `.srv` file:
+
+```text
+# Example: humanoid_interfaces/srv/CalibrateJoints.srv
+uint32 joint_mask          # Bitmask selecting target joint actuators
+float64 max_torque_limit   # Maximum torque allowed during index search
+---
+bool success               # Calibration outcome
+string message             # Status or error diagnostic string
+float64[] homed_positions  # Recorded absolute zero angles (rad)
 ```
 
-### Update `package.xml`
+### When to Use Services vs. Topics:
+- **USE SERVICES FOR**: Atomic, one-off, discrete commands where the caller *must* know the success/failure outcome before proceeding (e.g., `SetSafetyMode`, `ResetOdometry`, `ZeroForceTorqueSensors`).
+- **NEVER USE SERVICES FOR**: Continuous high-frequency commands (e.g., streaming 500 Hz joint position targets). Services generate substantial header overhead, lack zero-copy optimizations, and create brittle synchronization dependencies.
 
-You need to declare that your package exports a service. Add these lines to `~/ros2_ws/src/my_python_pkg/package.xml`:
+---
 
-```xml
-  <buildtool_depend>ament_cmake</buildtool_depend>
-  <build_depend>rosidl_default_generators</build_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
+## 2. The Deadlock Hazard: Blocking in Single-Threaded Executors
+
+Consider a common anti-pattern: A supervisor node has a 10 Hz timer that evaluates robot stability. Inside the timer callback, the developer makes a synchronous service call:
+
+```cpp
+// ANTI-PATTERN: GUARANTEED DEADLOCK IN SingleThreadedExecutor!
+void timer_callback() {
+  auto request = std::make_shared<CalibrateJoints::Request>();
+  // Blocking wait for future inside the executor thread
+  auto result_future = client_->async_send_request(request);
+  auto response = result_future.get(); // BLOCKS THREAD!
+}
 ```
 
-Also, ensure you have `std_msgs` or any other message dependencies in your `package.xml`. For custom services, you need `rosidl_default_generators` for building and `rosidl_default_runtime` for execution.
+### Why This Deadlocks:
+1. The `SingleThreadedExecutor` is actively running `timer_callback()`.
+2. The thread blocks waiting for `result_future.get()`.
+3. The service response arrives from the network and is placed on the executor queue.
+4. But the executor cannot dispatch the response callback because the single worker thread is permanently blocked inside `timer_callback()`!
+5. **Result**: The entire node freezes permanently, watchdog timers expire, and the humanoid crashes to the floor.
 
-### Update `setup.py`
+---
 
-You also need to tell `setup.py` to process the `.srv` files.
-Add the following to `~/ros2_ws/src/my_python_pkg/setup.py`:
+## 3. The Professional Solution: Reentrant Groups & Async Futures
 
-```python
-from setuptools import find_packages, setup
-import os
-from glob import glob
+To safely invoke services without deadlocks, you must apply two architectural patterns:
+1. **Assign the Service Client to a `Reentrant` Callback Group**.
+2. **Handle responses asynchronously using non-blocking lambdas (`std::future::then`) or spin the client within a dedicated `MultiThreadedExecutor`**.
 
-package_name = 'my_python_pkg'
-
-setup(
-    name=package_name,
-    version='0.0.0',
-    packages=find_packages(exclude=['test']),
-    data_files=[
-        ('share/' + package_name, ['package.xml']),
-        ('share/' + package_name + '/srv', glob('srv/*.srv')), # Add this line
-        ('share/ament_index/resource_index/packages',
-            ['resource/' + package_name]),
-        (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.[pxy][yeml]*'))),
-    ],
-    install_requires=['setuptools'],
-    zip_safe=True,
-    maintainer='your_name',
-    maintainer_email='your_email@example.com',
-    description='TODO: Package description',
-    license='TODO: License declaration',
-    tests_require=['pytest'],
-    entry_points={
-        'console_scripts': [
-            'talker = my_python_pkg.talker_node:main',
-            'talker_publisher = my_python_pkg.talker_publisher:main',
-            'listener_subscriber = my_python_pkg.listener_subscriber:main',
-            'add_two_ints_server = my_python_pkg.add_two_ints_server:main',
-            'add_two_ints_client = my_python_pkg.add_two_ints_client:main',
-        ],
-    },
-)
+```mermaid
+flowchart TD
+    subgraph NonBlockingPattern["Safe Asynchronous Service Invocation Architecture"]
+        TimerCB["10 Hz Supervisor Timer Callback"] --> Dispatch["async_send_request(request)"]
+        Dispatch --> NonBlockingWait["Attach Response Promise Handler"]
+        NonBlockingWait --> Exit["Exit Timer Callback Immediately (Thread Unblocked)"]
+        
+        ResponseArrives["Service Response Arrives on Network"] --> ReentrantGroup["Reentrant Callback Group"]
+        ReentrantGroup --> WorkerThread["Available Executor Worker Thread"]
+        WorkerThread --> ExecuteCallback["Execute Promise Handler: Log Status & Enable Gait"]
+    end
 ```
 
-### Service Server (`add_two_ints_server.py`)
+---
 
-Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/add_two_ints_server.py`:
+## 4. Production C++20 Non-Blocking Service Implementation
 
-```python
-import rclpy
-from rclpy.node import Node
-from my_python_pkg.srv import AddTwoInts # Import your service type
+Below is a robust implementation of a humanoid power management service client that executes asynchronously with safety timeouts:
 
-class AddTwoIntsServer(Node):
-    def __init__(self):
-        super().__init__('add_two_ints_server')
-        self.srv = self.create_service(AddTwoInts, 'add_two_ints', self.add_two_ints_callback)
-        self.get_logger().info('Add two ints service ready.')
+```cpp
+#include <chrono>
+#include <memory>
+#include "rclcpp/rclcpp.hpp"
+#include "std_srvs/srv/set_bool.hpp"
 
-    def add_two_ints_callback(self, request, response):
-        response.sum = request.a + request.b
-        self.get_logger().info(f'Incoming request: a={request.a}, b={request.b}')
-        self.get_logger().info(f'Sending response: sum={response.sum}')
-        return response
+using namespace std::chrono_literals;
 
-def main(args=None):
-    rclpy.init(args=args)
-    add_two_ints_server = AddTwoIntsServer()
-    rclpy.spin(add_two_ints_server)
-    rclpy.shutdown()
+class SafePowerSupervisor : public rclcpp::Node {
+public:
+  SafePowerSupervisor() : Node("safe_power_supervisor") {
+    // 1. Create a Reentrant callback group to allow concurrent callback dispatch
+    client_cb_group_ = create_callback_group(rclcpp::CallbackGroupType::Reentrant);
 
-if __name__ == '__main__':
-    main()
+    // 2. Initialize the service client within the reentrant group
+    power_client_ = create_client<std_srvs::srv::SetBool>(
+      "/hardware/power_distribution/enable_high_voltage",
+      rmw_qos_profile_services_default,
+      client_cb_group_);
+
+    // 3. Initiate non-blocking asynchronous request
+    call_power_service_async(true);
+  }
+
+  void call_power_service_async(bool enable_power) {
+    if (!power_client_->wait_for_service(2s)) {
+      RCLCPP_ERROR(get_logger(), "Power distribution service unavailable! Aborting.");
+      return;
+    }
+
+    auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+    request->data = enable_power;
+
+    RCLCPP_INFO(get_logger(), "Dispatching asynchronous power request...");
+
+    // Non-blocking call returning a shared_future
+    auto future_result = power_client_->async_send_request(
+      request,
+      [this](rclcpp::Client<std_srvs::srv::SetBool>::SharedFuture future) {
+        // Callback invoked when response arrives without blocking the executor
+        try {
+          auto response = future.get();
+          if (response->success) {
+            RCLCPP_INFO(get_logger(), "High voltage bus enabled: %s", response->message.c_str());
+          } else {
+            RCLCPP_ERROR(get_logger(), "Power bus rejected enable: %s", response->message.c_str());
+          }
+        } catch (const std::exception & e) {
+          RCLCPP_FATAL(get_logger(), "Service call failed with exception: %s", e.what());
+        }
+      });
+  }
+
+private:
+  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr power_client_;
+};
+
+int main(int argc, char * argv[]) {
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<SafePowerSupervisor>();
+
+  // Must use MultiThreadedExecutor with Reentrant Callback Groups
+  rclcpp::executors::MultiThreadedExecutor executor(
+    rclcpp::ExecutorOptions(), 4 /* 4 worker threads */);
+  executor.add_node(node);
+  executor.spin();
+
+  rclcpp::shutdown();
+  return 0;
+}
 ```
 
-### Service Client (`add_two_ints_client.py`)
-
-Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/add_two_ints_client.py`:
-
-```python
-import sys
-import rclpy
-from rclpy.node import Node
-from my_python_pkg.srv import AddTwoInts # Import your service type
-
-class AddTwoIntsClient(Node):
-    def __init__(self):
-        super().__init__('add_two_ints_client')
-        self.cli = self.create_client(AddTwoInts, 'add_two_ints')
-        while not self.cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Service not available, waiting again...')
-        self.req = AddTwoInts.Request()
-
-    def send_request(self, a, b):
-        self.req.a = a
-        self.req.b = b
-        self.future = self.cli.call_async(self.req)
-        rclpy.spin_until_future_complete(self, self.future)
-        return self.future.result()
-
-def main(args=None):
-    rclpy.init(args=args)
-    add_two_ints_client = AddTwoIntsClient()
-    if len(sys.argv) != 3:
-        add_two_ints_client.get_logger().info('Usage: ros2 run my_python_pkg add_two_ints_client <arg1> <arg2>')
-        sys.exit(1)
-    
-    a = int(sys.argv[1])
-    b = int(sys.argv[2])
-    response = add_two_ints_client.send_request(a, b)
-    if response:
-        add_two_ints_client.get_logger().info(f'Result of add_two_ints: {a} + {b} = {response.sum}')
-    else:
-        add_two_ints_client.get_logger().info('Service call failed.')
-    
-    add_two_ints_client.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
-```
-
-## Building and Running
-
-1.  **Build the workspace (including new service definition):**
-    ```bash
-    cd ~/ros2_ws
-    colcon build --packages-select my_python_pkg
-    source install/setup.bash
-    ```
-2.  **Run the service server in one terminal:**
-    ```bash
-    ros2 run my_python_pkg add_two_ints_server
-    ```
-3.  **Run the service client in another terminal:**
-    ```bash
-    ros2 run my_python_pkg add_two_ints_client 5 7
-    ```
-    The client should send the request, and the server should respond with `12`.
-
-## `ros2 service` Commands
-
-*   **`ros2 service list`:** Lists all active services.
-*   **`ros2 service type <service_name>`:** Displays the service type.
-*   **`ros2 service find <service_type>`:** Finds all services of a given type.
-*   **`ros2 service call <service_name> <service_type> <args>`:** Calls a service from the command line.
-
-Services are essential for specific, on-demand interactions between nodes, complementing the continuous data flow provided by topics.
+In the next chapter, we transition from short-lived RPCs to long-horizon, preemptible tasks: **ROS 2 Actions for Humanoid Locomotion and Manipulation**.
