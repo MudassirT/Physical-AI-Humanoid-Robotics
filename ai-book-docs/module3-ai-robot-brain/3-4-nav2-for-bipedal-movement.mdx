@@ -1,45 +1,132 @@
 ---
 sidebar_position: 4
+title: Nav2 for Bipedal Locomotion & Footstep Planning
 ---
 
-## Nav2 for Bipedal Movement
+# Nav2 for Bipedal Locomotion & Footstep Planning
 
-Once a robot can build a map and locate itself within it, the next logical step is to move from point A to point B. In ROS 2, the standard tool for this is the **Navigation Stack**, commonly known as **Nav2**. While Nav2 was primarily designed for wheeled robots, its modular architecture allows us to adapt it for more complex platforms like humanoids.
+Standard mobile robot navigation stacks (e.g., standard Nav2 for wheeled AMRs) model the world as a 2D occupancy grid where any non-zero height obstacle represents an impassable collision. 
 
-### The Map → Plan → Control Pipeline
+For a humanoid robot, this 2D paradigm is fundamentally broken. A humanoid does not roll across flat floors: it **steps over** ground cables, **climbs up** stairwells, **traverses** uneven stepping stones, and **adjusts its stance width** dynamically.
 
-Nav2 operates on a simple yet powerful pipeline:
+Modern bipedal navigation integrates **Nav2 3D Elevation Mapping**, **Discrete Footstep Lattice Planners**, and **Capture Point Dynamic Stabilization**.
 
-1.  **Map**: Nav2 takes in a map of the environment. This can be a pre-made map (from a building's floor plan) or, more commonly, a map generated in real-time by a SLAM system like the Isaac ROS VSLAM node. It also uses sensor data to build a **costmap** on top of this map, which we'll discuss shortly.
+```mermaid
+flowchart TD
+    subgraph BipedalNav2Stack["Nav2 Bipedal Humanoid Navigation & Stabilization Loop"]
+        direction TB
 
-2.  **Plan**: When you provide a goal pose (an `(x, y, θ)` coordinate) in RViz or through an action call, the **Global Planner** calculates a high-level path from the robot's current position to the goal. This planner operates on the global map and finds the optimal route, avoiding static obstacles.
+        subgraph GlobalPlanning["1. Global Route & Terrain Perception (1-5 Hz)"]
+            DepthCloud["Dense Stereo Depth Cloud (Isaac ROS cuVSLAM)"] --> ElevationMap["3D Elevation Mapping (GridMap / OctoMap)"]
+            ElevationMap --> TerrainAnalysis["Foothold Affordance Filter (Slope, Roughness, Friction)"]
+            TerrainAnalysis --> AStarLattice["ARA* Discrete Footstep Lattice Planner"]
+            GoalPose["Target Navigation Goal (PoseStamped)"] --> AStarLattice
+        end
 
-3.  **Control**: The global plan is then passed to the **Local Planner** (also known as the Controller). The local planner's job is to generate the immediate velocity commands (`cmd_vel` messages, typically `Twist` messages containing linear and angular velocities) required to follow the global plan while avoiding local, dynamic obstacles (like a person walking by).
+        subgraph LocalStabilization["2. Dynamic Stepping & Capture Point Control (50-100 Hz)"]
+            AStarLattice --> FootstepSequence["Discrete Footstep Sequence [Step_1, Step_2, ..., Step_N]"]
+            FootstepSequence --> CP_Planner["Capture Point / DCM Dynamic Step Adjuster"]
+            IMUFeedback["Live IMU & CoM State (1 kHz)"] --> CP_Planner
+            CP_Planner --> AdjustedFootsteps["Disturbance-Compensated Foot Trajectories"]
+        end
 
-For a wheeled robot, this `cmd_vel` is straightforward: it tells the wheels how fast to turn. For a humanoid, it's more complex. A `cmd_vel` message might instruct the robot's walking pattern generator to "walk forward at 0.5 m/s and turn at 0.1 rad/s."
+        subgraph WholeBodyExecution["3. Whole-Body Quadratic Programming Controller (1 kHz)"]
+            AdjustedFootsteps --> QP_WBC["QP Whole-Body Controller (Torque Optimization)"]
+            FrictionCones["Friction Cone Constraints: |Ft| <= mu * Fn"] --> QP_WBC
+            TorqueLimits["Joint Limits & Motor Thermal Capacities"] --> QP_WBC
+            QP_WBC --> MotorEfforts["Optimized Joint Torques tau dispatched to Actuators"]
+        end
+    end
+```
 
-### Adapting Nav2 for Humanoids
+---
 
-The default planners and controllers in Nav2 are designed for robots that can move in any direction at any time (holonomic) or robots that move like a car (Ackermann steering). A walking humanoid is neither. It has a limited turning radius, acceleration constraints, and, most importantly, it can't stop on a dime or move sideways instantly.
+## 1. Why 2D Costmaps Fail: The 3D Elevation Mapping Solution
 
-Adapting Nav2 requires careful tuning and, in some cases, custom plugins:
+A 15 cm step is considered an impassable obstacle by standard Nav2 costmaps. To enable humanoids to navigate real human environments, the terrain is represented as an **Elevation Map** $z = h(x, y)$ computed from GPU point clouds:
 
-*   **Global Planner**: A standard A* or Dijkstra-based global planner (like `navfn` or the Smac Planner) often works well, as the high-level path doesn't need to consider the robot's dynamics in detail.
-*   **Local Planner**: This is where the most adaptation is needed. The local planner must be aware of the humanoid's limitations. You might need to:
-    *   **Tune Parameters**: Aggressively lower the acceleration and velocity limits to match what the robot's walking gait can safely handle.
-    *   **Use a Custom Plugin**: For advanced performance, you might replace the default local planner with one specifically designed for legged robots, such as a TEB (Timed Elastic Band) or MPC (Model Predictive Control) planner with parameters and constraints tailored to bipedal locomotion.
+1. **Cell Slope Angle**:
+   ```text
+   theta = arccos( normal_z )
+   ```
+   If `theta > 25°`, the cell is classified as non-traversable.
+2. **Cell Roughness (Height Variance)**:
+   ```text
+   sigma_z = sqrt( (1/M) * sum( (z_i - z_mean)^2 ) )
+   ```
+   Excessive roughness marks the foothold as slipping-prone.
+3. **Step Height Difference**:
+   Differences between consecutive footholds are bounded by maximum leg articulation reach:
+   ```text
+   Delta_z <= 0.22 meters (Maximum step climb threshold)
+   ```
 
-### Costmaps for Bipedal Walking
+---
 
-Perhaps the most critical adaptation for a bipedal robot is the **costmap**. A costmap is a 2D grid that represents the "cost" of traversing any cell in the environment.
-*   A cell with a cost of 0 is free space.
-*   A cell with a cost of 255 is a lethal obstacle (the robot is forbidden to enter).
-*   Values in between represent areas that are traversable but should be avoided if possible (e.g., being too close to a wall).
+## 2. Dynamic Stability: The Capture Point (CP) & Divergent Component of Motion
 
-Nav2 uses two costmaps:
-1.  **Global Costmap**: Used by the global planner to find a path around known, static obstacles.
-2.  **Local Costmap**: A smaller, rolling window around the robot used by the local planner to react to dynamic, moving obstacles from real-time sensor data.
+During dynamic walking, the Center of Mass (CoM) is almost never statically supported inside the footprint polygon. Dynamic balance is governed by the **Linear Inverted Pendulum Model (LIPM)** and the **Capture Point** (Pratt et al., 2006).
 
-For a bipedal robot, the costmap configuration is crucial. The **inflation radius**—an area of extra cost drawn around obstacles—must be set appropriately. For a wheeled robot, this radius might be just a few centimeters larger than its physical footprint. For a humanoid, you must account for the swing of its arms and the dynamic envelope of its walking motion. The inflation radius needs to be much larger to ensure the robot doesn't clip its arms on a doorway or bump into a table while walking.
+### The Capture Point Mathematical Formulation
+The Capture Point `x_CP` is the exact location on the ground where the humanoid must place its swing foot to bring the moving center of mass to a complete halt:
 
-By carefully configuring the costmaps and choosing and tuning the appropriate planners, you can successfully leverage the power of Nav2 to bring autonomous, point-to-point navigation to a simulated humanoid robot, all powered by the perception pipeline you built with Isaac ROS.
+```text
+x_CP = x_CoM + ( dx_CoM / omega_0 )
+```
+
+where:
+- **`x_CoM`**: Horizontal position of the center of mass.
+- **`dx_CoM`**: Horizontal velocity of the center of mass.
+- **`omega_0`**: Natural pendulum frequency:
+
+```text
+omega_0 = sqrt( g / z_CoM )
+```
+
+(for typical humanoid center of mass height `z_CoM ≈ 0.85 m`, `omega_0 ≈ 3.4 rad/s`).
+
+```mermaid
+flowchart LR
+    subgraph CapturePointDynamics["Dynamic Balance via Capture Point Adaptation"]
+        CoM["CoM State: Position x_CoM, Velocity dx_CoM"] --> CalcCP["Compute Capture Point: x_CP = x_CoM + dx_CoM / omega_0"]
+        CalcCP --> PushTest{"Did an external push displace x_CP outside the foot?"}
+        
+        PushTest -- NO --> AnkleStrategy["1. Ankle Strategy: Modulate ankle torque without taking extra step"]
+        PushTest -- YES --> StepStrategy["2. Stepping Strategy: Dynamically retarget swing foot directly onto x_CP!"]
+    end
+```
+
+If an external disturbance pushes the robot, the local step generator dynamically shifts the upcoming swing foot touchdown target to intercept `x_CP`, absorbing the kinetic energy and preventing a fall.
+
+---
+
+## 3. Whole-Body Control: Hierarchical Quadratic Programming (QP-WBC)
+
+Once footstep trajectories are planned, they are executed by a **Whole-Body Quadratic Programming Controller** running at 1 kHz:
+
+```text
+min_{ddq, tau, lambda} [ 
+  w_com * || J_com * ddq + dJ_com * dq - dd_x_des_com ||^2 +
+  w_swing * || J_swing * ddq + dJ_swing * dq - dd_x_des_swing ||^2 +
+  w_posture * || ddq - ddq_nominal ||^2 +
+  w_tau * || tau ||^2 
+]
+```
+
+**Subject to strict physical constraints**:
+1. Floating-base equations of motion:
+   ```text
+   M(q) * ddq + C(q, dq) * dq + g(q) = S^T * tau + sum( J_ci^T * lambda_i )
+   ```
+2. Coulomb friction cone constraints on ground reaction forces:
+   ```text
+   sqrt( F_x^2 + F_y^2 ) <= mu * F_z,   F_z >= 0
+   ```
+3. Hardware joint torque and speed limits:
+   ```text
+   tau_min <= tau <= tau_max,   q_min <= q <= q_max
+   ```
+
+Using modern real-time QP solvers such as **OSQP** or **qpOASES**, the solution `(ddq*, tau*, lambda*)` is found in under **0.5 milliseconds**, driving the physical joint motors directly.
+
+In the next chapter, we synthesize these tools into a comprehensive hands-on project: **Autonomous Humanoid Goal Navigation with cuVSLAM and Nav2**.
