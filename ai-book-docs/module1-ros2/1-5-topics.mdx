@@ -1,130 +1,149 @@
 ---
 sidebar_position: 5
+title: Topics, QoS Policies & Zero-Copy Shared Memory
 ---
 
-# Topics 
+# Topics, QoS Policies & Zero-Copy Shared Memory
 
-**Topics** are the most common communication mechanism in ROS 2, providing a publish-subscribe model for asynchronous data streaming. They are ideal for broadcasting continuous data streams, such as sensor readings, robot odometry, video feeds, or status updates.
+A bipedal humanoid generates an immense sensory throughput: dual 4K stereo cameras streaming at 60 Hz produce over 1.5 GB/s of raw uncompressed visual data; 32 joint encoders stream at 500 Hz; dual tactical-grade 6-axis IMUs publish at 1,000 Hz; and foot contact sensors stream reaction forces at 1 kHz.
 
-## Publish-Subscribe Model
+Transporting these multi-rate, high-bandwidth streams across the robotic nervous system without dropped packets, CPU thrashing, or latency spikes requires mastering **ROS 2 Topics**, **Quality of Service (QoS) Profiles**, and **Zero-Copy Shared Memory IPC (Eclipse Iceoryx)**.
 
-*   **Publisher:** A node that sends messages to a specific topic. It doesn't know (or care) which nodes are receiving the data.
-*   **Subscriber:** A node that receives messages from a specific topic. It doesn't know (or care) which nodes are sending the data.
-*   **Topic Name:** A unique string identifier for the communication channel (e.g., `/camera/image_raw`, `/odom`, `/robot_status`).
-*   **Message Type:** Every topic has a defined message type (e.g., `sensor_msgs/msg/Image`, `nav_msgs/msg/Odometry`, `std_msgs/msg/String`). This ensures that publishers and subscribers agree on the data structure.
+```mermaid
+flowchart TD
+    subgraph TraditionalIPC["Traditional Socket-Based Transport (3-4 Memory Copies)"]
+        Publisher1["Publisher Process (User Space)"] -->|Copy 1: Serialize to buffer| UserBuf1["User Memory Buffer"]
+        UserBuf1 -->|Copy 2: Syscall write()| Kernel1["Kernel Socket Buffer"]
+        Kernel1 -->|Network Stack / Loopback| Kernel2["Receiving Kernel Buffer"]
+        Kernel2 -->|Copy 3: Syscall read()| UserBuf2["Subscriber User Buffer"]
+        UserBuf2 -->|Copy 4: Deserialize| Subscriber1["Subscriber Process"]
+    end
 
-## Creating a Publisher and Subscriber (Python Example)
-
-Let's expand on our `my_python_pkg` from the Nodes section to create a publisher and subscriber.
-
-First, define a custom message type (e.g., `Num.msg`) in a new package if you don't want to use standard messages. For simplicity, we'll use `std_msgs/msg/String`.
-
-### Publisher Node (`talker_publisher.py`)
-
-Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/talker_publisher.py`:
-
-```python
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
-
-class TalkerPublisher(Node):
-    def __init__(self):
-        super().__init__('talker_publisher')
-        self.publisher_ = self.create_publisher(String, 'chatter', 10)
-        self.timer = self.create_timer(0.5, self.timer_callback)
-        self.i = 0
-        self.get_logger().info('Talker Publisher Node started.')
-
-    def timer_callback(self):
-        msg = String()
-        msg.data = f'Hello ROS 2: {self.i}'
-        self.publisher_.publish(msg)
-        self.get_logger().info(f'Publishing: "{msg.data}"')
-        self.i += 1
-
-def main(args=None):
-    rclpy.init(args=args)
-    talker_publisher = TalkerPublisher()
-    rclpy.spin(talker_publisher)
-    talker_publisher.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
+    subgraph ZeroCopyIPC["Zero-Copy Shared Memory IPC (Eclipse Iceoryx)"]
+        Publisher2["Publisher: loan_message()"] --> ShmPool["Shared Memory Chunk Pool (/dev/shm)"]
+        ShmPool -->|Pointer Swap (Zero CPU Memory Copy)| Subscriber2["Subscriber: take_loaned_message()"]
+        NoteZero["Latency: < 15 microseconds regardless of payload size (4K RGB or 100k LiDAR PointCloud)"]
+    end
 ```
 
-### Subscriber Node (`listener_subscriber.py`)
+---
 
-Create `~/ros2_ws/src/my_python_pkg/my_python_pkg/listener_subscriber.py`:
+## 1. Quality of Service (QoS) Policies: The Determinism Rules
 
-```python
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import String
+In ROS 1, all communication defaulted to TCP streams. In ROS 2, every Publisher and Subscriber specifies a fine-grained **QoS Profile**. If the QoS policies of the publisher and subscriber are incompatible, **no connection will be established**, and the subscriber will receive zero messages without generating a runtime error.
 
-class ListenerSubscriber(Node):
-    def __init__(self):
-        super().__init__('listener_subscriber')
-        self.subscription = self.create_subscription(
-            String,
-            'chatter',
-            self.listener_callback,
-            10)
-        self.subscription # prevent unused variable warning
-        self.get_logger().info('Listener Subscriber Node started.')
-
-    def listener_callback(self, msg):
-        self.get_logger().info(f'I heard: "{msg.data}"')
-
-def main(args=None):
-    rclpy.init(args=args)
-    listener_subscriber = ListenerSubscriber()
-    rclpy.spin(listener_subscriber)
-    listener_subscriber.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
+```mermaid
+graph TD
+    subgraph QoSPolicies["Core ROS 2 QoS Dimensions for Humanoid Systems"]
+        Reliability["1. Reliability<br/>• BEST_EFFORT: Discard dropped packets immediately.<br/>• RELIABLE: Retransmit lost packets until acknowledged."]
+        Durability["2. Durability<br/>• VOLATILE: Stored only while subscriber active.<br/>• TRANSIENT_LOCAL: Late-joining nodes receive last published message."]
+        History["3. History & Depth<br/>• KEEP_LAST (N): Keep latest N samples in ring buffer.<br/>• KEEP_ALL: Retain all messages until resource exhaustion."]
+        Deadline["4. Deadline<br/>• Enforce maximum time delta between consecutive messages.<br/>• Triggers hardware watchdog if sensor halts."]
+        Liveliness["5. Liveliness<br/>• AUTOMATIC vs. MANUAL_BY_NODE.<br/>• Detects node heartbeat death immediately."]
+    end
 ```
 
-## Update `setup.py`
+### The QoS Compatibility Matrix
+DDS enforces the **"Request vs. Offered" (RxO)** contract rule: A subscriber's requested QoS cannot be stricter than what the publisher offers:
 
-Add the new executables to `~/ros2_ws/src/my_python_pkg/setup.py` under `console_scripts`:
+| Publisher Offers | Subscriber Requests | Compatible? | Behavioral Result |
+| :--- | :--- | :--- | :--- |
+| `RELIABLE` | `BEST_EFFORT` | **YES** | Messages delivered without retransmission overhead. |
+| `BEST_EFFORT` | `RELIABLE` | **NO (Silent Failure)** | **Zero messages received.** Connection rejected by DDS. |
+| `TRANSIENT_LOCAL` | `VOLATILE` | **YES** | Subscriber only processes new live messages. |
+| `VOLATILE` | `TRANSIENT_LOCAL` | **NO (Silent Failure)** | Connection rejected; subscriber cannot receive cached state. |
 
-```python
-    entry_points={
-        'console_scripts': [
-            'talker = my_python_pkg.talker_node:main', # Existing
-            'talker_publisher = my_python_pkg.talker_publisher:main',
-            'listener_subscriber = my_python_pkg.listener_subscriber:main',
-        ],
-    },
+### Standard Humanoid QoS Profiles:
+1. **Sensory Streams (IMU, Encoders, LiDAR)**:
+   - Reliability: `BEST_EFFORT` (Stale sensor readings are dangerous; never retransmit past timestamps).
+   - History: `KEEP_LAST`, Depth: `1` to `5`.
+   - Durability: `VOLATILE`.
+2. **Kinematic Descriptions & Coordinate Transforms (`/tf_static`)**:
+   - Reliability: `RELIABLE`.
+   - Durability: `TRANSIENT_LOCAL` (Allows late-joining nodes to immediately acquire robot kinematic links).
+   - History: `KEEP_LAST`, Depth: `1`.
+3. **Emergency Stop & Safety Heartbeats**:
+   - Reliability: `RELIABLE`.
+   - Deadline: `std::chrono::milliseconds(10)` (Trigger fallback brakes if deadline missed).
+
+---
+
+## 2. Zero-Copy Shared Memory Architecture (Eclipse Iceoryx)
+
+When transferring a single 4K stereo camera frame (3840 &times; 2160 &times; 3 bytes &approx; 24.8 MB) at 60 Hz:
+- Traditional socket serialisation requires moving **1.49 GB per second** through the CPU cache, causing severe cache eviction and starving the 1 kHz balance control thread.
+- **Zero-Copy Shared Memory (Eclipse Iceoryx)** allocates a fixed chunk pool inside POSIX shared memory (`/dev/shm`).
+
+### The Loaned Message Workflow:
+1. The Publisher requests a pointer to an unallocated chunk directly from the shared memory pool:
+   ```cpp
+   auto loaned_msg = publisher->borrow_loaned_message();
+   ```
+2. The camera driver writes raw sensor pixels directly into `loaned_msg.get()` via DMA (Direct Memory Access).
+3. The Publisher dispatches the message. Rather than copying bytes, DDS merely transmits a **64-bit memory address pointer** to the subscriber.
+4. The Subscriber processes the memory block in place, releasing the reference counter when finished.
+5. CPU consumption drops from **35% of an 8-core CPU** to **&lt; 0.5%**, and latency drops to sub-microsecond levels.
+
+---
+
+## 3. Production C++20 Zero-Copy Sensor Publisher & Subscriber
+
+```cpp
+#include <chrono>
+#include <memory>
+#include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+
+using namespace std::chrono_literals;
+
+class HighRateImuPublisher : public rclcpp::Node {
+public:
+  HighRateImuPublisher() : Node("high_rate_imu_publisher") {
+    // 1. Configure strict Real-Time Sensor QoS
+    rclcpp::QoS sensor_qos(rclcpp::KeepLast(1));
+    sensor_qos.best_effort();  // Drop dropped packets; never block for retransmits
+    sensor_qos.durability_volatile();
+
+    // 2. Create publisher with loaned message capability
+    imu_pub_ = create_publisher<sensor_msgs::msg::Imu>("/sensors/imu/data_raw", sensor_qos);
+
+    // 3. Start 1,000 Hz timer (1 ms interval)
+    timer_ = create_wall_timer(1ms, std::bind(&HighRateImuPublisher::publish_imu, this));
+  }
+
+private:
+  void publish_imu() {
+    // Check if underlying middleware supports loaned zero-copy memory
+    if (imu_pub_->can_loan_messages()) {
+      auto loaned_msg = imu_pub_->borrow_loaned_message();
+
+      // Populate directly in shared memory chunk
+      loaned_msg.get().header.stamp = now();
+      loaned_msg.get().header.frame_id = "imu_link";
+      loaned_msg.get().linear_acceleration.z = 9.80665; // Nominal gravity
+
+      // Zero-copy pointer dispatch
+      imu_pub_->publish(std::move(loaned_msg));
+    } else {
+      // Fallback for non-zero-copy transports
+      auto msg = std::make_unique<sensor_msgs::msg::Imu>();
+      msg->header.stamp = now();
+      msg->header.frame_id = "imu_link";
+      msg->linear_acceleration.z = 9.80665;
+      imu_pub_->publish(std::move(msg));
+    }
+  }
+
+  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::TimerBase::SharedPtr timer_;
+};
+
+int main(int argc, char * argv[]) {
+  rclcpp::init(argc, argv);
+  rclcpp::spin(std::make_shared<HighRateImuPublisher>());
+  rclcpp::shutdown();
+  return 0;
+}
 ```
 
-## Building and Running
-
-1.  **Build the workspace:**
-    ```bash
-    cd ~/ros2_ws
-    colcon build --packages-select my_python_pkg
-    source install/setup.bash
-    ```
-2.  **Run the publisher in one terminal:**
-    ```bash
-    ros2 run my_python_pkg talker_publisher
-    ```
-3.  **Run the subscriber in another terminal:**
-    ```bash
-    ros2 run my_python_pkg listener_subscriber
-    ```
-    You should see the subscriber node printing the messages published by the talker node.
-
-## `ros2 topic` Commands
-
-*   **`ros2 topic list`:** Lists all active topics.
-*   **`ros2 topic info <topic_name>`:** Displays the message type, publishers, and subscribers for a topic.
-*   **`ros2 topic echo <topic_name>`:** Prints messages being published on a topic to the console.
-*   **`ros2 topic pub <topic_name> <message_type> <args>`:** Publishes data to a topic from the command line.
-
-Topics are fundamental for building distributed and dynamic robotic systems, allowing different components to share information efficiently.
+In the next chapter, we analyze discrete request-response primitives: **Services, Thread Starvation, and Reentrant Concurrency**.
