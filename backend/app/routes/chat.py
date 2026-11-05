@@ -8,8 +8,11 @@ Endpoints:
 """
 
 from fastapi import APIRouter, HTTPException
+
 from app.core.logging import get_logger
+
 from ..agent.agent_service import AgentService
+from ..retriever.retriever_service import RetrieverService
 from ..schemas.chat_models import (
     ChatQuery,
     ChatResponse,
@@ -17,7 +20,6 @@ from ..schemas.chat_models import (
     RetrievalTestQuery,
     RetrievalTestResponse,
 )
-from ..retriever.retriever_service import RetrieverService
 
 router = APIRouter(tags=["RAG Chat"])
 logger = get_logger(__name__)
