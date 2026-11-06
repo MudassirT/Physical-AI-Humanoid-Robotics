@@ -29,6 +29,7 @@
   --surface-elevated: #ffffff;
   --surface-border: #e2e8f0;
   --surface-border-subtle: #f1f5f9;
+  --surface-border-hover: rgba(99, 102, 241, 0.35);
 
   /* --- Typography --- */
   --ifm-font-color-base: #0f172a;
