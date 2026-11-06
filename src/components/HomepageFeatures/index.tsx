@@ -4,9 +4,68 @@ import Heading from '@theme/Heading';
 import styles from './styles.module.css';
 import Link from '@docusaurus/Link';
 
+// ---------------------------------------------------------------------------
+// Module SVG Icons (Precision Vector)
+// ---------------------------------------------------------------------------
+
+function NervousSystemIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
+
+function DigitalTwinIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z" />
+      <path d="M12 12l8-4.5" />
+      <path d="M12 12v9" />
+      <path d="M12 12L4 7.5" />
+    </svg>
+  );
+}
+
+function RobotBrainIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <rect x="9" y="9" width="6" height="6" />
+      <path d="M9 1v3" />
+      <path d="M15 1v3" />
+      <path d="M9 20v3" />
+      <path d="M15 20v3" />
+      <path d="M20 9h3" />
+      <path d="M20 14h3" />
+      <path d="M1 9h3" />
+      <path d="M1 14h3" />
+    </svg>
+  );
+}
+
+function VLAIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z" />
+      <path d="m19 5 2-2" />
+      <path d="m19 19 2 2" />
+    </svg>
+  );
+}
+
+function BulletCheckIcon() {
+  return (
+    <svg className={styles.bulletCheck} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+    </svg>
+  );
+}
+
 type FeatureItem = {
   num: string;
-  icon: string;
+  icon: ReactNode;
   title: string;
   description: ReactNode;
   bullets: string[];
@@ -16,7 +75,7 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     num: '01',
-    icon: '⚡',
+    icon: <NervousSystemIcon />,
     title: 'Module 1: The Robotic Nervous System (ROS 2)',
     description: (
       <>
@@ -29,7 +88,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     num: '02',
-    icon: '🌐',
+    icon: <DigitalTwinIcon />,
     title: 'Module 2: The Digital Twin (Gazebo & Unity)',
     description: (
       <>
@@ -42,7 +101,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     num: '03',
-    icon: '🧠',
+    icon: <RobotBrainIcon />,
     title: 'Module 3: The AI-Robot Brain (NVIDIA Isaac)',
     description: (
       <>
@@ -55,7 +114,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     num: '04',
-    icon: '🤖',
+    icon: <VLAIcon />,
     title: 'Module 4: Vision-Language-Action (VLA)',
     description: (
       <>
@@ -74,7 +133,9 @@ function Feature({ num, icon, title, description, bullets, to }: FeatureItem) {
       <div className={styles.card}>
         <div className={styles.cardHeader}>
           <span className={styles.cardBadge}>Module {num}</span>
-          <span className={styles.cardIcon}>{icon}</span>
+          <div className={styles.iconBox}>
+            {icon}
+          </div>
         </div>
 
         <Heading as="h3" className={styles.cardTitle}>{title}</Heading>
@@ -83,7 +144,8 @@ function Feature({ num, icon, title, description, bullets, to }: FeatureItem) {
         <ul className={styles.cardBullets}>
           {bullets.map((b) => (
             <li key={b} className={styles.cardBulletItem}>
-              {b}
+              <BulletCheckIcon />
+              <span>{b}</span>
             </li>
           ))}
         </ul>
