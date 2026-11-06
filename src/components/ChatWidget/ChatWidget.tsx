@@ -1,24 +1,3 @@
-/**
- * ChatWidget — React component that provides an interactive Q&A interface
- * powered by the FastAPI RAG Agent backend.
- *
- * Features:
- * - Sends user queries to POST /ask on the configured backend.
- * - Displays user and agent messages in a scrollable chat history.
- * - Shows a pulsing typing indicator while awaiting a response.
- * - Displays source citations from the agent's retrieved context.
- * - Handles network errors gracefully with user-friendly messages.
- * - Prevents submission of empty queries.
- * - Automatically scrolls to the latest message.
- * - Keyboard accessible (Enter to send).
- * - ARIA live region for screen reader announcements.
- * - Clear chat button.
- * - Welcome message on first load.
- *
- * Environment configuration:
- *   REACT_APP_FASTAPI_BASE_URL — Override the backend URL (default: http://127.0.0.1:8000)
- */
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import styles from './ChatWidget.module.css';
 
@@ -40,13 +19,70 @@ interface AskResponse {
 }
 
 // ---------------------------------------------------------------------------
+// SVG Icons
+// ---------------------------------------------------------------------------
+
+function BotIcon() {
+  return (
+    <svg className={styles.chatHeaderIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <circle cx="12" cy="5" r="2" />
+      <path d="M12 7v4" />
+      <line x1="8" y1="16" x2="8" y2="16" />
+      <line x1="16" y1="16" x2="16" y2="16" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg className={styles.clearIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 6h18" />
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg className={styles.sendIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg className={styles.sourceIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
+
+function SparklesIcon() {
+  return (
+    <svg className={styles.suggestionsHeaderIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg className={styles.promptCardArrow} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Returns the backend base URL from the injected environment variable,
- * falling back to localhost for local development.
- */
 function getBackendUrl(): string {
   return (process.env.REACT_APP_FASTAPI_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8000';
 }
@@ -61,6 +97,17 @@ const WELCOME_MESSAGE: ChatMessage = {
   sender: 'agent',
   timestamp: new Date(),
 };
+
+interface SuggestedPrompt {
+  topic: string;
+  query: string;
+}
+
+const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
+  { topic: 'Module 1 • ROS 2', query: 'What is the ROS 2 DDS middleware layer and QoS?' },
+  { topic: 'Module 2 • Simulation', query: 'How do Gazebo and Unity simulate Digital Twins?' },
+  { topic: 'Module 4 • VLA', query: 'How do Vision-Language-Action (VLA) models work in humanoid robotics?' },
+];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -83,20 +130,15 @@ const ChatWidget: React.FC = () => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // ------------------------------------------------------------------
   // Clear chat
-  // ------------------------------------------------------------------
   const handleClear = useCallback(() => {
     setMessages([WELCOME_MESSAGE]);
     inputRef.current?.focus();
   }, []);
 
-  // ------------------------------------------------------------------
-  // Send message handler
-  // ------------------------------------------------------------------
-
-  const handleSendMessage = useCallback(async () => {
-    const trimmed = inputMessage.trim();
+  // Send message handler (supports direct invocation from suggestion cards)
+  const handleSendMessage = useCallback(async (customQuery?: string) => {
+    const trimmed = (customQuery ?? inputMessage).trim();
     if (!trimmed || isLoading) return;
 
     const userMessage: ChatMessage = {
@@ -126,7 +168,7 @@ const ChatWidget: React.FC = () => {
           const errData = await response.json();
           detail = errData.detail ?? detail;
         } catch {
-          // Ignore JSON parse failure — keep the status code message.
+          // Ignore JSON parse failure
         }
         throw new Error(detail);
       }
@@ -159,7 +201,7 @@ const ChatWidget: React.FC = () => {
     }
   }, [inputMessage, isLoading]);
 
-  // Handle Enter key (without Shift) to submit.
+  // Handle Enter key to submit
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
@@ -170,16 +212,14 @@ const ChatWidget: React.FC = () => {
     [handleSendMessage, isLoading],
   );
 
-  // ------------------------------------------------------------------
-  // Render
-  // ------------------------------------------------------------------
-
   return (
     <div className={styles.chatContainer} role="region" aria-label="RAG Chat Assistant">
       {/* ---- Header ---- */}
       <div className={styles.chatHeader}>
         <div className={styles.chatHeaderLeft}>
-          <div className={styles.chatHeaderIconWrapper}><svg className={styles.chatHeaderIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /></svg></div>
+          <div className={styles.chatHeaderIconWrapper}>
+            <BotIcon />
+          </div>
           <div>
             <div className={styles.chatHeaderTitle}>RAG Assistant</div>
             <div className={styles.chatHeaderSub}>Physical AI & Humanoid Robotics</div>
@@ -189,7 +229,7 @@ const ChatWidget: React.FC = () => {
         <div className={styles.chatHeaderRight}>
           {/* Online status */}
           <div className={styles.statusDot}>
-            <div className={`${styles.statusDotCircle} ${isLoading ? '' : ''}`} />
+            <div className={styles.statusDotCircle} />
             {isLoading ? 'Thinking…' : 'Online'}
           </div>
 
@@ -200,7 +240,8 @@ const ChatWidget: React.FC = () => {
             aria-label="Clear chat history"
             title="Clear chat"
           >
-            Clear
+            <TrashIcon />
+            <span>Clear</span>
           </button>
         </div>
       </div>
@@ -213,18 +254,6 @@ const ChatWidget: React.FC = () => {
         aria-atomic="false"
         aria-label="Chat messages"
       >
-        {messages.length === 0 && (
-          <div className={styles.emptyState}>
-            <span className={styles.emptyStateIcon}>💬</span>
-            <p className={styles.emptyStateText}>
-              Ask me anything about <strong>Physical AI & Humanoid Robotics</strong>!
-            </p>
-            <p className={styles.emptyStateHint}>
-              Try: "What is ROS 2?" or "Explain Vision-Language-Action models"
-            </p>
-          </div>
-        )}
-
         {messages.map((message) => (
           <div
             key={message.id}
@@ -233,7 +262,7 @@ const ChatWidget: React.FC = () => {
             aria-label={`${message.sender === 'user' ? 'You' : message.sender === 'agent' ? 'Agent' : 'System'}: ${message.text}`}
           >
             <div className={styles.messageSender}>
-              {message.sender === 'user' ? 'You' : message.sender === 'agent' ? '🤖 Agent' : '⚠️ System'}
+              {message.sender === 'user' ? 'You' : message.sender === 'agent' ? 'AI Assistant' : 'System Notice'}
             </div>
             <div className={styles.messageText}>{message.text}</div>
 
@@ -250,7 +279,8 @@ const ChatWidget: React.FC = () => {
                     className={styles.sourceLink}
                     aria-label={`Source ${index + 1}: ${source}`}
                   >
-                    [{index + 1}]
+                    <span>[{index + 1}]</span>
+                    <ExternalLinkIcon />
                   </a>
                 ))}
               </div>
@@ -261,6 +291,33 @@ const ChatWidget: React.FC = () => {
             </div>
           </div>
         ))}
+
+        {/* Suggested Quick Prompts on initial load — compact horizontal grid without inner scroll */}
+        {messages.length === 1 && (
+          <div className={styles.suggestionsWrapper}>
+            <div className={styles.suggestionsHeader}>
+              <SparklesIcon />
+              <span>Suggested starter questions grounded in the book:</span>
+            </div>
+            <div className={styles.promptGrid}>
+              {SUGGESTED_PROMPTS.map((p, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={styles.promptCard}
+                  onClick={() => handleSendMessage(p.query)}
+                  disabled={isLoading}
+                >
+                  <div className={styles.promptCardContent}>
+                    <span className={styles.promptBadge}>{p.topic}</span>
+                    <span className={styles.promptText}>{p.query}</span>
+                  </div>
+                  <ChevronRightIcon />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Pulsing typing indicator */}
         {isLoading && (
@@ -282,7 +339,7 @@ const ChatWidget: React.FC = () => {
           ref={inputRef}
           type="text"
           className={styles.messageInput}
-          placeholder="Ask a question about the book…"
+          placeholder="Ask a technical question about any chapter…"
           value={inputMessage}
           onChange={(e) => setInputMessage(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -293,11 +350,11 @@ const ChatWidget: React.FC = () => {
         />
         <button
           className={styles.sendButton}
-          onClick={handleSendMessage}
+          onClick={() => handleSendMessage()}
           disabled={isLoading || !inputMessage.trim()}
           aria-label="Send message"
         >
-          <span className={styles.sendIcon}>&gt;</span>
+          <SendIcon />
           <span className={styles.sendButtonLabel}>Send</span>
         </button>
       </div>
