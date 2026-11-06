@@ -27,6 +27,11 @@ const config: Config = {
 
   onBrokenLinks: 'throw',
 
+  markdown: {
+    mermaid: true,
+  },
+  themes: ['@docusaurus/theme-mermaid'],
+
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
   // may want to replace "en" with "zh-Hans".
@@ -89,6 +94,9 @@ const config: Config = {
   themeConfig: {
     // Replace with your project's social card
     image: 'img/docusaurus-social-card.jpg',
+    mermaid: {
+      theme: {light: 'neutral', dark: 'dark'},
+    },
     colorMode: {
       defaultMode: 'dark',
       disableSwitch: false,
@@ -96,13 +104,14 @@ const config: Config = {
     },
     navbar: {
       title: 'Physical AI & Humanoid Robotics',
-              logo: {
-                alt: 'Physical AI Humanoid Robotics Logo',
-                src: 'img/physical-ai-robotics-logo.svg',
+      logo: {
+        alt: 'Physical AI Humanoid Robotics Logo',
+        src: 'img/physical-ai-robotics-logo.svg',
         srcDark: 'img/physical-ai-robotics-logo.svg',
         width: 32,
         height: 32,
-      },              items: [
+      },
+      items: [
                 {
                   to: '/ai-book/intro',
                   label: 'Curriculum',
