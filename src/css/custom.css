@@ -10,13 +10,13 @@
    ============================================================ */
 :root {
   /* --- Brand Palette --- */
-  --ifm-color-primary: #3b49df;
-  --ifm-color-primary-dark: #2f3ab2;
-  --ifm-color-primary-darker: #29339c;
-  --ifm-color-primary-darkest: #1e2572;
-  --ifm-color-primary-light: #5865f2;
-  --ifm-color-primary-lighter: #7983f5;
-  --ifm-color-primary-lightest: #eff1fe;
+  --ifm-color-primary: #4338ca;
+  --ifm-color-primary-dark: #3730a3;
+  --ifm-color-primary-darker: #312e81;
+  --ifm-color-primary-darkest: #1e1b4b;
+  --ifm-color-primary-light: #4f46e5;
+  --ifm-color-primary-lighter: #6366f1;
+  --ifm-color-primary-lightest: #eef2ff;
 
   --ifm-color-secondary: #0ea5e9;
   --ifm-color-secondary-dark: #0284c7;
