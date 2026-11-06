@@ -179,7 +179,7 @@ const ChatWidget: React.FC = () => {
       {/* ---- Header ---- */}
       <div className={styles.chatHeader}>
         <div className={styles.chatHeaderLeft}>
-          <span className={styles.chatHeaderIcon}>🤖</span>
+          <div className={styles.chatHeaderIconWrapper}><svg className={styles.chatHeaderIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="11" width="18" height="10" rx="2" /><circle cx="12" cy="5" r="2" /><path d="M12 7v4" /></svg></div>
           <div>
             <div className={styles.chatHeaderTitle}>RAG Assistant</div>
             <div className={styles.chatHeaderSub}>Physical AI & Humanoid Robotics</div>
@@ -200,7 +200,7 @@ const ChatWidget: React.FC = () => {
             aria-label="Clear chat history"
             title="Clear chat"
           >
-            🗑 Clear
+            Clear
           </button>
         </div>
       </div>
@@ -297,7 +297,7 @@ const ChatWidget: React.FC = () => {
           disabled={isLoading || !inputMessage.trim()}
           aria-label="Send message"
         >
-          <span className={styles.sendIcon}>✈️</span>
+          <span className={styles.sendIcon}>&gt;</span>
           <span className={styles.sendButtonLabel}>Send</span>
         </button>
       </div>
