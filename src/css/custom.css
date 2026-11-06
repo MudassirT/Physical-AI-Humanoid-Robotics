@@ -121,7 +121,7 @@ h1, h2, h3, h4, h5, h6 {
 .navbar {
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background-color: rgba(255, 255, 255, 0.8) !important;
+  background-color: rgba(255, 255, 255, 0.85) !important;
   border-bottom: 1px solid var(--surface-border);
   box-shadow: none;
   height: 64px;
@@ -130,7 +130,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 [data-theme='dark'] .navbar {
-  background-color: rgba(9, 10, 15, 0.75) !important;
+  background-color: rgba(7, 9, 14, 0.82) !important;
   border-bottom: 1px solid var(--surface-border);
 }
 
