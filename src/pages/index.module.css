@@ -67,7 +67,10 @@
   font-weight: 800 !important;
   line-height: 1.12 !important;
   letter-spacing: -0.035em !important;
-  color: #0f172a !important;
+  background: linear-gradient(135deg, #0f172a 20%, #334155 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   max-width: 960px;
   margin: 0 auto;
 }
