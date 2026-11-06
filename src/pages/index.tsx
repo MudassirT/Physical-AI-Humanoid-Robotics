@@ -10,11 +10,63 @@ import ChatWidget from '@site/src/components/ChatWidget/ChatWidget';
 import styles from './index.module.css';
 
 // ---------------------------------------------------------------------------
+// SVG Icons (Lucide-inspired vector precision)
+// ---------------------------------------------------------------------------
+
+function ArrowRightIcon() {
+  return (
+    <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}
+
+function BookOpenIcon() {
+  return (
+    <svg className={styles.stepIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+    </svg>
+  );
+}
+
+function SimulationIcon() {
+  return (
+    <svg className={styles.stepIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <polyline points="3.29 7 12 12 20.71 7" />
+      <line x1="12" y1="22" x2="12" y2="12" />
+    </svg>
+  );
+}
+
+function BrainAIIcon() {
+  return (
+    <svg className={styles.stepIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2a4 4 0 0 0-4 4v2a4 4 0 0 0-2 3.46V14a4 4 0 0 0 2 3.46V18a4 4 0 0 0 4 4h0a4 4 0 0 0 4-4v-.54A4 4 0 0 0 18 14v-2.54A4 4 0 0 0 16 8V6a4 4 0 0 0-4-4z" />
+      <path d="M9 12h6" />
+      <path d="M12 9v6" />
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Hero
 // ---------------------------------------------------------------------------
 
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
+
+  const handleScrollToExplore = () => {
+    const el = document.getElementById('curriculum-modules');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: window.innerHeight * 0.85, behavior: 'smooth' });
+    }
+  };
+
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
       <div className="container">
@@ -39,12 +91,13 @@ function HomepageHeader() {
           <Link
             className="button button--primary button--lg"
             to="/ai-book/intro">
-            Start Reading →
+            <span>Start Reading</span>
+            <ArrowRightIcon />
           </Link>
           <Link
             className="button button--secondary button--lg"
             to="/ai-book/intro">
-            Browse Curriculum
+            <span>Browse Curriculum</span>
           </Link>
         </div>
 
@@ -70,10 +123,15 @@ function HomepageHeader() {
       </div>
 
       {/* Scroll indicator */}
-      <div className={styles.scrollIndicator}>
+      <button
+        type="button"
+        className={styles.scrollIndicator}
+        onClick={handleScrollToExplore}
+        aria-label="Scroll to explore curriculum modules"
+      >
         <span>Scroll to explore</span>
         <div className={styles.scrollArrow} />
-      </div>
+      </button>
     </header>
   );
 }
@@ -85,19 +143,19 @@ function HomepageHeader() {
 function HowItWorks() {
   const steps = [
     {
-      icon: '📚',
+      icon: <BookOpenIcon />,
       num: 1,
       title: 'Structured Curriculum',
       desc: 'Master 4 core modules covering ROS 2, Gazebo physics, Unity visualization, and Vision-Language-Action systems.',
     },
     {
-      icon: '🧪',
+      icon: <SimulationIcon />,
       num: 2,
       title: 'Simulation & Digital Twins',
       desc: 'Practice safely with high-fidelity digital twins in Gazebo, Unity, and NVIDIA Isaac before real hardware deployment.',
     },
     {
-      icon: '🤖',
+      icon: <BrainAIIcon />,
       num: 3,
       title: 'Context-Aware AI Tutor',
       desc: 'Ask questions anytime. The embedded RAG agent retrieves exact chapter excerpts to ground every explanation with citations.',
@@ -117,7 +175,9 @@ function HowItWorks() {
           {steps.map((s) => (
             <div key={s.num} className={styles.stepCard}>
               <div className={styles.stepHeader}>
-                <span className={styles.stepIcon}>{s.icon}</span>
+                <div className={styles.stepIconWrapper}>
+                  {s.icon}
+                </div>
                 <span className={styles.stepNumber}>Step 0{s.num}</span>
               </div>
               <div className={styles.stepTitle}>{s.title}</div>
