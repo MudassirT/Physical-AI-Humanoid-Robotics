@@ -132,12 +132,12 @@ const config: Config = {
           title: 'Community',
           items: [
             {
-              label: 'Youtube',
-              href: 'http://youtube.com/channel/UC0SxCVKA6U2oDSZ1ecK_TMA',
+              label: 'YouTube',
+              href: 'https://www.youtube.com/@MudassirAhmedMuhammadTariq',
             },
             {
-              label: 'Twitter',
-              href: 'https://x.com/BismaArshad_Dev/',
+              label: 'X (Twitter)',
+              href: 'https://x.com/Mudassir__Ahmed',
             },
           ],
         },
