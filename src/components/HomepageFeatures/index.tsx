@@ -100,7 +100,7 @@ function Feature({ num, icon, title, description, bullets, to }: FeatureItem) {
 
 export default function HomepageFeatures(): ReactNode {
   return (
-    <section className={styles.features}>
+    <section id="curriculum-modules" className={styles.features}>
       <div className="container">
         <Heading as="h2" className={styles.sectionTitle}>
           Curriculum Modules
