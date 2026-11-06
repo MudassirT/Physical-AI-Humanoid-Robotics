@@ -7,7 +7,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'Physical AI & Humanoid Robotics',
   tagline: 'Your Comprehensive Guide to Intelligent Robot Systems',
-  favicon: 'img/favicon.ico',
+  favicon: 'img/physical-ai-robotics-logo.svg',
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -98,8 +98,11 @@ const config: Config = {
       title: 'Physical AI & Humanoid Robotics',
               logo: {
                 alt: 'Physical AI Humanoid Robotics Logo',
-                src: 'img/physical-ai-robotics-logo.png',
-              },              items: [
+                src: 'img/physical-ai-robotics-logo.svg',
+        srcDark: 'img/physical-ai-robotics-logo.svg',
+        width: 32,
+        height: 32,
+      },              items: [
                 {
                   to: '/ai-book/intro',
                   label: 'Curriculum',
