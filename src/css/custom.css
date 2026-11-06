@@ -1,12 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /**
  * Global CSS — Physical AI & Humanoid Robotics
- * Aesthetic, minimal, enterprise-grade design tokens.
+ * ProMax Design System: Precision typography, subtle dark/light glassmorphism,
+ * micro-interactions, and enterprise-grade color tokens.
  */
 
 /* ============================================================
-   LIGHT MODE — Modern Minimalist Tokens
+   LIGHT MODE — High-Contrast Modern Minimalist Tokens
    ============================================================ */
 :root {
   /* --- Brand Palette --- */
@@ -18,9 +19,9 @@
   --ifm-color-primary-lighter: #6366f1;
   --ifm-color-primary-lightest: #eef2ff;
 
-  --ifm-color-secondary: #0ea5e9;
-  --ifm-color-secondary-dark: #0284c7;
-  --ifm-color-secondary-light: #38bdf8;
+  --ifm-color-secondary: #0284c7;
+  --ifm-color-secondary-dark: #0369a1;
+  --ifm-color-secondary-light: #0ea5e9;
   --ifm-color-secondary-lightest: #f0f9ff;
 
   /* --- Surfaces & Canvas --- */
@@ -33,7 +34,8 @@
 
   /* --- Typography --- */
   --ifm-font-color-base: #0f172a;
-  --ifm-font-color-secondary: #64748b;
+  --ifm-font-color-secondary: #475569;
+  --ifm-font-color-muted: #64748b;
   --ifm-font-family-base: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --ifm-heading-font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --ifm-font-family-monospace: 'JetBrains Mono', monospace;
@@ -43,20 +45,22 @@
   /* --- Radii --- */
   --radius-xs: 4px;
   --radius-sm: 8px;
-  --radius-md: 14px;
-  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --radius-full: 9999px;
 
-  /* --- Shadows --- */
-  --shadow-subtle: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  /* --- Shadows & Glows --- */
+  --shadow-subtle: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
   --shadow-card: 0 4px 20px -2px rgba(15, 23, 42, 0.06), 0 2px 6px -1px rgba(15, 23, 42, 0.04);
   --shadow-hover: 0 16px 36px -4px rgba(15, 23, 42, 0.1), 0 6px 14px -2px rgba(15, 23, 42, 0.06);
+  --shadow-glow: 0 0 24px -4px rgba(79, 70, 229, 0.25);
   --shadow-glass: 0 8px 32px 0 rgba(15, 23, 42, 0.08);
 
   /* --- Gradients --- */
-  --gradient-brand: linear-gradient(135deg, #3b49df 0%, #6366f1 100%);
+  --gradient-brand: linear-gradient(135deg, #4338ca 0%, #6366f1 100%);
   --gradient-text: linear-gradient(135deg, #0f172a 30%, #475569 100%);
-  --gradient-hero-accent: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 60%);
+  --gradient-card-border: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, transparent 60%);
 
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.16, 1, 0.3, 1);
@@ -64,7 +68,7 @@
 }
 
 /* ============================================================
-   DARK MODE — Linear/Vercel Aesthetic
+   DARK MODE — Pro Dark Silicon Valley Aesthetic (Linear / Vercel)
    ============================================================ */
 [data-theme='dark'] {
   --ifm-color-primary: #6366f1;
@@ -80,15 +84,18 @@
   --surface-elevated: #111420;
   --surface-border: rgba(255, 255, 255, 0.08);
   --surface-border-subtle: rgba(255, 255, 255, 0.04);
+  --surface-border-hover: rgba(99, 102, 241, 0.5);
 
   --ifm-font-color-base: #f8fafc;
   --ifm-font-color-secondary: #94a3b8;
+  --ifm-font-color-muted: #64748b;
 
-  --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.4), 0 2px 6px -1px rgba(0, 0, 0, 0.3);
-  --shadow-hover: 0 16px 40px -4px rgba(0, 0, 0, 0.6), 0 8px 18px -2px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 4px 24px -2px rgba(0, 0, 0, 0.5), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-hover: 0 16px 40px -4px rgba(0, 0, 0, 0.7), 0 8px 18px -2px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 32px -4px rgba(99, 102, 241, 0.35);
 
   --gradient-text: linear-gradient(135deg, #ffffff 40%, #94a3b8 100%);
-  --gradient-hero-accent: radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.18) 0%, transparent 65%);
+  --gradient-card-border: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, transparent 60%);
 }
 
 /* ============================================================
@@ -97,6 +104,11 @@
 html {
   scroll-behavior: smooth;
   font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+}
+
+::selection {
+  background: rgba(99, 102, 241, 0.25);
+  color: inherit;
 }
 
 body {
@@ -136,7 +148,7 @@ h1, h2, h3, h4, h5, h6 {
 
 .navbar__title {
   font-weight: 700;
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   letter-spacing: -0.02em;
   color: var(--ifm-font-color-base) !important;
 }
@@ -153,7 +165,6 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--ifm-color-primary) !important;
 }
 
-/* Logo icon styling */
 .navbar__brand img {
   width: 32px;
   height: 32px;
@@ -171,7 +182,6 @@ h1, h2, h3, h4, h5, h6 {
    ============================================================ */
 .button {
   font-weight: 600;
-  cursor: pointer;
   letter-spacing: -0.01em;
   border-radius: var(--radius-md);
   transition: all var(--transition-fast) !important;
@@ -179,24 +189,30 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.7rem 1.4rem;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.95rem;
+  cursor: pointer;
 }
 
 .button--primary {
   background: var(--ifm-color-primary) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
   color: #ffffff !important;
-  box-shadow: var(--shadow-subtle);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
 }
 
 .button--primary:hover {
   background: var(--ifm-color-primary-dark) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 20px -2px rgba(99, 102, 241, 0.35) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px -2px rgba(99, 102, 241, 0.4) !important;
+}
+
+.button--primary:active {
+  transform: translateY(0);
 }
 
 .button--secondary {
-  background: #ffffff !important;
+  background: var(--surface-elevated) !important;
   border: 1px solid var(--surface-border) !important;
   color: var(--ifm-font-color-base) !important;
   box-shadow: var(--shadow-subtle);
@@ -204,21 +220,26 @@ h1, h2, h3, h4, h5, h6 {
 
 .button--secondary:hover {
   background: var(--ifm-background-surface-color) !important;
-  border-color: #cbd5e1 !important;
+  border-color: rgba(99, 102, 241, 0.4) !important;
   color: var(--ifm-color-primary) !important;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.button--secondary:active {
+  transform: translateY(0);
 }
 
 [data-theme='dark'] .button--secondary {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-color: rgba(255, 255, 255, 0.16) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
   color: #ffffff !important;
   backdrop-filter: blur(12px);
 }
 
 [data-theme='dark'] .button--secondary:hover {
-  background: rgba(255, 255, 255, 0.14) !important;
-  border-color: rgba(255, 255, 255, 0.3) !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(99, 102, 241, 0.6) !important;
   color: #ffffff !important;
 }
 
@@ -240,25 +261,25 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--ifm-background-surface-color) !important;
   border-top: 1px solid var(--surface-border);
   color: var(--ifm-font-color-secondary);
-  padding: 3.5rem 0;
+  padding: 4rem 0 3rem;
 }
 
 /* ============================================================
    SCROLLBAR
    ============================================================ */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.3);
+  background: rgba(148, 163, 184, 0.28);
   border-radius: var(--radius-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.5);
+  background: rgba(148, 163, 184, 0.45);
 }
 
 /* ============================================================
@@ -271,6 +292,29 @@ h1, h2, h3, h4, h5, h6 {
   background-clip: text;
 }
 
-.section-divider {
-  display: none; /* Replaced by elegant whitespace and typographic hierarchy */
+/* ============================================================
+   MERMAID DIAGRAMS — ProMax High-Definition Styling
+   ============================================================ */
+.docusaurus-mermaid-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2.25rem 0;
+  padding: 2rem 1.5rem;
+  background: var(--surface-elevated);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow-x: auto;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.docusaurus-mermaid-container:hover {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: var(--shadow-hover);
+}
+
+.docusaurus-mermaid-container svg {
+  max-width: 100%;
+  height: auto;
 }
