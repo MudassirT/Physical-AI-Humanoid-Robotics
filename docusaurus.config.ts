@@ -22,8 +22,8 @@ const config: Config = {
 
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  organizationName: 'MudassirT', // Usually your GitHub org/user name.
+  projectName: 'GIAIC-Hackathon', // Usually your repo name.
 
   onBrokenLinks: 'throw',
 
@@ -111,7 +111,7 @@ const config: Config = {
                   docsPluginId: 'ai-book',
                 },
                 {
-                  href: 'https://github.com/BBismaarshad',
+                  href: 'https://github.com/MudassirT/GIAIC-Hackathon',
                   label: 'GitHub',
                   position: 'right',
                 },
@@ -146,7 +146,7 @@ const config: Config = {
           items: [
             {
               label: 'GitHub',
-              href: 'https://github.com/BBismaarshad',
+              href: 'https://github.com/MudassirT/GIAIC-Hackathon',
             },
           ],
         },
