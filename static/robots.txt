@@ -1,0 +1,38 @@
+# =============================================================================
+# Robots.txt — Physical AI & Humanoid Robotics
+# Senior SEO Architecture: Optimized for Maximum Crawl Efficiency & Sitelinks
+# =============================================================================
+
+User-agent: *
+Allow: /
+Disallow: /backend/
+Disallow: /api/
+Disallow: /*.json$
+
+# Major Search Engine Crawlers
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 0
+
+User-agent: Applebot
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+# Sitemap Index
+Sitemap: https://your-docusaurus-site.example.com/sitemap.xml
+
