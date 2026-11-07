@@ -25,7 +25,8 @@ def retrieve_chunks(query_text: str, top_k: int = 5) -> list[ContentChunk]:
     query_embedding = embeddings[0]
 
     # Search for the most similar vectors in Qdrant
-    collection_name = "ai-book-chunks"
+    import os
+    collection_name = os.getenv("COLLECTION_NAME", "ragbot_embedding")
 
     search_result = qdrant_client.query_points(
         collection_name=collection_name,
