@@ -1,64 +1,76 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
-    <linearGradient id="pAI-grad-chassis" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#818CF8" />
-      <stop offset="50%" stop-color="#6366F1" />
-      <stop offset="100%" stop-color="#4338CA" />
-    </linearGradient>
-    <linearGradient id="pAI-grad-visor" x1="36" y1="46" x2="92" y2="64" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#38BDF8" />
-      <stop offset="100%" stop-color="#06B6D4" />
-    </linearGradient>
-    <linearGradient id="pAI-grad-neural" x1="48" y1="48" x2="80" y2="96" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#6366F1" />
-      <stop offset="100%" stop-color="#10B981" />
-    </linearGradient>
-    <linearGradient id="pAI-grad-core" x1="56" y1="72" x2="72" y2="88" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#10B981" />
-      <stop offset="100%" stop-color="#06B6D4" />
-    </linearGradient>
-    <radialGradient id="pAI-core-glow" cx="64" cy="80" r="16" gradientUnits="userSpaceOnUse">
-      <stop offset="0%" stop-color="#06B6D4" stop-opacity="0.4" />
-      <stop offset="100%" stop-color="#06B6D4" stop-opacity="0" />
+    <!-- Background Outer Glow -->
+    <radialGradient id="pAI-glow" cx="64" cy="64" r="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#6366f1" stop-opacity="0.35" />
+      <stop offset="70%" stop-color="#06b6d4" stop-opacity="0.1" />
+      <stop offset="100%" stop-color="#07090e" stop-opacity="0" />
     </radialGradient>
+
+    <!-- Outer Frame Gradient -->
+    <linearGradient id="pAI-outer" x1="16" y1="12" x2="112" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#a5b4fc" />
+      <stop offset="35%" stop-color="#6366f1" />
+      <stop offset="70%" stop-color="#4338ca" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+
+    <!-- Cyber Visor Holographic Gradient -->
+    <linearGradient id="pAI-visor" x1="36" y1="46" x2="92" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#06b6d4" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+
+    <!-- Neural Quantum Core Gradient -->
+    <radialGradient id="pAI-core" cx="64" cy="80" r="14" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="30%" stop-color="#38bdf8" />
+      <stop offset="75%" stop-color="#6366f1" />
+      <stop offset="100%" stop-color="#4338ca" />
+    </radialGradient>
+
+    <!-- Embodied Energy Wave -->
+    <linearGradient id="pAI-synapse" x1="44" y1="36" x2="84" y2="94" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#67e8f9" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
   </defs>
 
-  <!-- Ambient Core Glow -->
-  <circle cx="64" cy="80" r="16" fill="url(#pAI-core-glow)" />
+  <!-- Ambient Light Dome -->
+  <circle cx="64" cy="64" r="58" fill="url(#pAI-glow)" />
 
-  <!-- Outer Cybernetic Hex Shield Framework -->
-  <polygon points="64,12 114,40 114,88 64,116 14,88 14,40"
-           stroke="url(#pAI-grad-chassis)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"
+  <!-- Outer Cybernetic Hex-Shield Chassis -->
+  <polygon points="64,10 116,39 116,89 64,118 12,89 12,39"
+           stroke="url(#pAI-outer)" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"
            fill="none" />
 
-  <!-- Inner Humanoid Head Architecture -->
-  <path d="M42 42 C42 30 52 24 64 24 C76 24 86 30 86 42 V68 C86 78 76 92 64 98 C52 92 42 78 42 68 Z"
-        fill="url(#pAI-grad-chassis)" fill-opacity="0.12"
-        stroke="url(#pAI-grad-chassis)" stroke-width="2.75" stroke-linejoin="round" />
+  <!-- Inner Concentric Frame -->
+  <polygon points="64,18 108,43 108,85 64,110 20,85 20,43"
+           stroke="url(#pAI-outer)" stroke-width="1.5" stroke-opacity="0.4"
+           fill="none" />
 
-  <!-- Cybernetic Optical Sensor Array / Visor -->
-  <path d="M46 48 H82 C85 48 87 50 87 53 V56 C87 59 85 61 82 61 H46 C43 61 41 59 41 56 V53 C41 50 43 48 46 48 Z"
-        fill="url(#pAI-grad-visor)" />
+  <!-- Humanoid Cranial Helmet Contour -->
+  <path d="M42 40 C42 27 52 20 64 20 C76 20 86 27 86 40 V66 C86 78 76 92 64 98 C52 92 42 78 42 66 Z"
+        fill="#0d111c" fill-opacity="0.88"
+        stroke="url(#pAI-outer)" stroke-width="3" stroke-linejoin="round" />
 
-  <!-- Central Synaptic Node (Physical AI Processor) -->
-  <circle cx="64" cy="80" r="6" fill="url(#pAI-grad-core)" stroke="#FFFFFF" stroke-width="1.5" />
+  <!-- Cybernetic Optical Sensor Visor (Embodied AI Perception) -->
+  <rect x="42" y="47" width="44" height="13" rx="6.5"
+        fill="url(#pAI-visor)" />
+  <circle cx="56" cy="53.5" r="2.2" fill="#ffffff" />
+  <circle cx="72" cy="53.5" r="2.2" fill="#ffffff" />
 
-  <!-- Precision Neural Bus Lines -->
-  <line x1="64" y1="61" x2="64" y2="74" stroke="url(#pAI-grad-visor)" stroke-width="2" stroke-linecap="round" />
-  <line x1="64" y1="86" x2="64" y2="94" stroke="url(#pAI-grad-chassis)" stroke-width="2" stroke-linecap="round" />
-  <line x1="58" y1="80" x2="49" y2="80" stroke="url(#pAI-grad-visor)" stroke-width="2" stroke-linecap="round" />
-  <line x1="70" y1="80" x2="79" y2="80" stroke="url(#pAI-grad-visor)" stroke-width="2" stroke-linecap="round" />
+  <!-- Synaptic Synapse Nodes -->
+  <line x1="64" y1="60" x2="64" y2="72" stroke="url(#pAI-synapse)" stroke-width="2.5" stroke-linecap="round" />
+  <line x1="53" y1="78" x2="44" y2="74" stroke="url(#pAI-synapse)" stroke-width="2" stroke-linecap="round" />
+  <line x1="75" y1="78" x2="84" y2="74" stroke="url(#pAI-synapse)" stroke-width="2" stroke-linecap="round" />
 
-  <!-- Telemetry Joint Accents -->
-  <circle cx="49" cy="80" r="2" fill="#38BDF8" />
-  <circle cx="79" cy="80" r="2" fill="#38BDF8" />
-  <circle cx="64" cy="94" r="2" fill="#818CF8" />
+  <!-- Quantum AI Motor Processing Core -->
+  <circle cx="64" cy="80" r="7.5" fill="url(#pAI-core)" stroke="#ffffff" stroke-width="1.8" />
+  <circle cx="64" cy="80" r="3.2" fill="#ffffff" />
 
-  <!-- Outer Vertex Hex Nodes -->
-  <circle cx="64" cy="12" r="3.5" fill="#38BDF8" />
-  <circle cx="114" cy="40" r="3" fill="#818CF8" />
-  <circle cx="114" cy="88" r="3" fill="#818CF8" />
-  <circle cx="64" cy="116" r="3.5" fill="#38BDF8" />
-  <circle cx="14" cy="88" r="3" fill="#818CF8" />
-  <circle cx="14" cy="40" r="3" fill="#818CF8" />
+  <!-- Lower Bipedal Foundation Bridge -->
+  <path d="M52 94 L64 102 L76 94" stroke="url(#pAI-outer)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="64" cy="102" r="2.5" fill="#10b981" />
 </svg>
