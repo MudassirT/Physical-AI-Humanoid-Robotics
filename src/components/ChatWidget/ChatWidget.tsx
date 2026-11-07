@@ -18,6 +18,18 @@ interface AskResponse {
   retrieved_sources: string[];
 }
 
+interface SuggestedPrompt {
+  topic: string;
+  query: string;
+}
+
+const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
+  { topic: 'Module 1 • ROS 2', query: 'What is the ROS 2 DDS middleware layer and QoS policies for humanoid joint control?' },
+  { topic: 'Module 2 • Simulation', query: 'How do Gazebo and Unity simulate Digital Twins and multi-contact dynamics?' },
+  { topic: 'Module 3 • Isaac ROS', query: 'How does NVIDIA Isaac ROS cuVSLAM compute visual-inertial odometry?' },
+  { topic: 'Module 4 • VLA Models', query: 'How do Vision-Language-Action (VLA) foundation models bridge voice commands to joint trajectories?' },
+];
+
 // ---------------------------------------------------------------------------
 // SVG Icons
 // ---------------------------------------------------------------------------
@@ -53,6 +65,23 @@ function SendIcon() {
   );
 }
 
+function CopyIcon() {
+  return (
+    <svg className={styles.copyIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg className={styles.copyIcon} viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 function ExternalLinkIcon() {
   return (
     <svg className={styles.sourceIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -83,6 +112,23 @@ function ChevronRightIcon() {
 // Helpers
 // ---------------------------------------------------------------------------
 
+function formatSourceUrl(src: string): string {
+  return src.replace(/\.mdx?$/, '');
+}
+
+function formatSourceLabel(src: string, index: number): string {
+  const clean = src.replace(/\.mdx?$/, '');
+  const parts = clean.split('/').filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (!last || last === 'intro') return 'Introduction';
+  const match = last.match(/^(\d+)-(\d+)-(.*)$/);
+  if (match) {
+    const topic = match[3].replace(/-/g, ' ');
+    return `Ch ${match[1]}.${match[2]}: ${topic.charAt(0).toUpperCase() + topic.slice(1)}`;
+  }
+  return last.replace(/-/g, ' ');
+}
+
 function getBackendUrl(): string {
   return (process.env.REACT_APP_FASTAPI_BASE_URL as string | undefined) ?? 'http://127.0.0.1:8000';
 }
@@ -93,21 +139,10 @@ function generateId(): string {
 
 const WELCOME_MESSAGE: ChatMessage = {
   id: 'welcome',
-  text: 'Hello! I\'m your RAG-powered AI assistant for the Physical AI & Humanoid Robotics book. Ask me anything about ROS 2, Digital Twins, NVIDIA Isaac, Vision-Language-Action models, and more!',
+  text: 'Hello! I am your RAG-powered Physical AI Assistant. I am grounded in all 26 chapters of the curriculum. Ask me technical questions about ROS 2 nodes, Gazebo rigid-body physics, NVIDIA Isaac perception, or Vision-Language-Action foundation models.',
   sender: 'agent',
   timestamp: new Date(),
 };
-
-interface SuggestedPrompt {
-  topic: string;
-  query: string;
-}
-
-const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
-  { topic: 'Module 1 • ROS 2', query: 'What is the ROS 2 DDS middleware layer and QoS?' },
-  { topic: 'Module 2 • Simulation', query: 'How do Gazebo and Unity simulate Digital Twins?' },
-  { topic: 'Module 4 • VLA', query: 'How do Vision-Language-Action (VLA) models work in humanoid robotics?' },
-];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -117,11 +152,11 @@ const ChatWidget: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME_MESSAGE]);
   const [inputMessage, setInputMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /** Scroll the message area to the latest message. */
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
@@ -130,13 +165,21 @@ const ChatWidget: React.FC = () => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  // Clear chat
+  const handleCopy = useCallback(async (msgId: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(msgId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Ignore copy error
+    }
+  }, []);
+
   const handleClear = useCallback(() => {
     setMessages([WELCOME_MESSAGE]);
     inputRef.current?.focus();
   }, []);
 
-  // Send message handler (supports direct invocation from suggestion cards)
   const handleSendMessage = useCallback(async (customQuery?: string) => {
     const trimmed = (customQuery ?? inputMessage).trim();
     if (!trimmed || isLoading) return;
@@ -187,8 +230,8 @@ const ChatWidget: React.FC = () => {
       console.error('[ChatWidget] Error sending message:', error);
       const errorText =
         error instanceof Error
-          ? `Error: ${error.message}`
-          : 'An unknown error occurred. Please try again.';
+          ? `Backend Connection Error: ${error.message}. Please ensure the FastAPI server is running.`
+          : 'An unknown error occurred. Please check backend logs.';
       const systemMessage: ChatMessage = {
         id: generateId(),
         text: errorText,
@@ -201,7 +244,6 @@ const ChatWidget: React.FC = () => {
     }
   }, [inputMessage, isLoading]);
 
-  // Handle Enter key to submit
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
@@ -213,7 +255,7 @@ const ChatWidget: React.FC = () => {
   );
 
   return (
-    <div className={styles.chatContainer} role="region" aria-label="RAG Chat Assistant">
+    <div id="ai-assistant-widget" className={styles.chatContainer} role="region" aria-label="RAG Chat Assistant">
       {/* ---- Header ---- */}
       <div className={styles.chatHeader}>
         <div className={styles.chatHeaderLeft}>
@@ -221,8 +263,8 @@ const ChatWidget: React.FC = () => {
             <BotIcon />
           </div>
           <div>
-            <div className={styles.chatHeaderTitle}>RAG Assistant</div>
-            <div className={styles.chatHeaderSub}>Physical AI & Humanoid Robotics</div>
+            <div className={styles.chatHeaderTitle}>Physical AI Tutor</div>
+            <div className={styles.chatHeaderSub}>Grounded Retrieval-Augmented Generation</div>
           </div>
         </div>
 
@@ -230,7 +272,7 @@ const ChatWidget: React.FC = () => {
           {/* Online status */}
           <div className={styles.statusDot}>
             <div className={styles.statusDotCircle} />
-            {isLoading ? 'Thinking…' : 'Online'}
+            <span>{isLoading ? 'Retrieving…' : 'Index Online • 26 Chapters'}</span>
           </div>
 
           {/* Clear chat */}
@@ -246,7 +288,7 @@ const ChatWidget: React.FC = () => {
         </div>
       </div>
 
-      {/* ---- Message area — ARIA live region ---- */}
+      {/* ---- Message area ---- */}
       <div
         className={styles.messageDisplay}
         role="log"
@@ -259,30 +301,52 @@ const ChatWidget: React.FC = () => {
             key={message.id}
             className={`${styles.messageBubble} ${styles[message.sender]}`}
             role="article"
-            aria-label={`${message.sender === 'user' ? 'You' : message.sender === 'agent' ? 'Agent' : 'System'}: ${message.text}`}
           >
-            <div className={styles.messageSender}>
-              {message.sender === 'user' ? 'You' : message.sender === 'agent' ? 'AI Assistant' : 'System Notice'}
+            <div className={styles.messageBubbleHeader}>
+              <span className={styles.messageSender}>
+                {message.sender === 'user' ? 'You' : message.sender === 'agent' ? 'AI Robotics Tutor' : 'System Notice'}
+              </span>
+              {message.sender === 'agent' && (
+                <button
+                  type="button"
+                  className={styles.copyActionBtn}
+                  onClick={() => handleCopy(message.id, message.text)}
+                  title="Copy explanation"
+                >
+                  {copiedId === message.id ? (
+                    <>
+                      <CheckIcon />
+                      <span>Copied</span>
+                    </>
+                  ) : (
+                    <>
+                      <CopyIcon />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
+
             <div className={styles.messageText}>{message.text}</div>
 
             {/* Source citations */}
             {message.sources && message.sources.length > 0 && (
               <div className={styles.messageSources}>
-                <span className={styles.sourcesLabel}>Sources:</span>
-                {message.sources.map((source, index) => (
-                  <a
-                    key={index}
-                    href={source}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.sourceLink}
-                    aria-label={`Source ${index + 1}: ${source}`}
-                  >
-                    <span>[{index + 1}]</span>
-                    <ExternalLinkIcon />
-                  </a>
-                ))}
+                <span className={styles.sourcesLabel}>Grounded Sources:</span>
+                <div className={styles.sourcePillsList}>
+                  {message.sources.map((source, index) => (
+                    <a
+                      key={index}
+                      href={formatSourceUrl(source)}
+                      className={styles.sourceLink}
+                      aria-label={`Source citation ${index + 1}: ${source}`}
+                    >
+                      <span>{formatSourceLabel(source, index)}</span>
+                      <ExternalLinkIcon />
+                    </a>
+                  ))}
+                </div>
               </div>
             )}
 
@@ -292,12 +356,12 @@ const ChatWidget: React.FC = () => {
           </div>
         ))}
 
-        {/* Suggested Quick Prompts on initial load — compact horizontal grid without inner scroll */}
+        {/* Suggested Quick Prompts */}
         {messages.length === 1 && (
           <div className={styles.suggestionsWrapper}>
             <div className={styles.suggestionsHeader}>
               <SparklesIcon />
-              <span>Suggested starter questions grounded in the book:</span>
+              <span>Recommended technical inquiries from the 4 curriculum modules:</span>
             </div>
             <div className={styles.promptGrid}>
               {SUGGESTED_PROMPTS.map((p, idx) => (
@@ -321,42 +385,46 @@ const ChatWidget: React.FC = () => {
 
         {/* Pulsing typing indicator */}
         {isLoading && (
-          <div className={styles.loadingIndicator} role="status" aria-live="assertive" aria-label="Agent is thinking">
+          <div className={styles.loadingIndicator} role="status" aria-live="assertive">
             <div className={styles.typingDots}>
               <span /><span /><span />
             </div>
-            Agent is thinking…
+            <span>Synthesizing technical response from Qdrant vector index…</span>
           </div>
         )}
 
-        {/* Scroll anchor */}
         <div ref={messagesEndRef} />
       </div>
 
       {/* ---- Input area ---- */}
       <div className={styles.inputArea}>
-        <input
-          ref={inputRef}
-          type="text"
-          className={styles.messageInput}
-          placeholder="Ask a technical question about any chapter…"
-          value={inputMessage}
-          onChange={(e) => setInputMessage(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={isLoading}
-          aria-label="Type your question here"
-          aria-disabled={isLoading}
-          maxLength={1000}
-        />
-        <button
-          className={styles.sendButton}
-          onClick={() => handleSendMessage()}
-          disabled={isLoading || !inputMessage.trim()}
-          aria-label="Send message"
-        >
-          <SendIcon />
-          <span className={styles.sendButtonLabel}>Send</span>
-        </button>
+        <div className={styles.inputContainer}>
+          <input
+            ref={inputRef}
+            type="text"
+            className={styles.messageInput}
+            placeholder="Ask a technical question about ROS 2, Gazebo, Isaac Sim, or VLA..."
+            value={inputMessage}
+            onChange={(e) => setInputMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={isLoading}
+            aria-label="Type your robotics question here"
+            maxLength={1000}
+          />
+          <button
+            className={styles.sendButton}
+            onClick={() => handleSendMessage()}
+            disabled={isLoading || !inputMessage.trim()}
+            aria-label="Send message"
+          >
+            <SendIcon />
+            <span className={styles.sendButtonLabel}>Send</span>
+          </button>
+        </div>
+        <div className={styles.inputHelperBar}>
+          <span>Press Enter to send • 100% grounded in book text</span>
+          <span>FastAPI + Qdrant Cloud</span>
+        </div>
       </div>
     </div>
   );
