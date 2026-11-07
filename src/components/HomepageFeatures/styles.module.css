@@ -1,42 +1,74 @@
 /* =========================================================
-   HomepageFeatures — Sleek Modern Card Layout
+   HomepageFeatures — Pro-Max Master Module Grid
    ========================================================= */
 
 .features {
-  padding: 6.5rem 1.5rem;
+  padding: 7rem 1.5rem;
   background: var(--ifm-background-color);
   border-bottom: 1px solid var(--surface-border);
+  position: relative;
 }
 
-/* Section header */
+/* Section Header Badge */
+.sectionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ifm-color-primary);
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+[data-theme='dark'] .sectionBadge {
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+}
+
+.sectionBadgeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #6366f1;
+  box-shadow: 0 0 8px #6366f1;
+}
+
 .sectionTitle {
   text-align: center;
-  font-size: clamp(1.8rem, 3.2vw, 2.5rem);
+  font-size: clamp(2rem, 3.5vw, 2.75rem);
   font-weight: 800;
-  letter-spacing: -0.03em;
-  margin-bottom: 0.5rem;
+  letter-spacing: -0.035em;
+  margin-bottom: 0.75rem;
+  color: var(--ifm-font-color-base);
 }
 
 .sectionSubtitle {
   text-align: center;
   color: var(--ifm-font-color-secondary);
-  font-size: 1.05rem;
-  max-width: 580px;
-  margin: 0.5rem auto 3.5rem;
-  line-height: 1.6;
+  font-size: 1.1rem;
+  max-width: 640px;
+  margin: 0 auto 4rem;
+  line-height: 1.65;
 }
 
-/* Card wrapper */
-.featureCard {
-  margin-bottom: 2rem;
+/* Column wrapper */
+.featureCol {
+  margin-bottom: 2.25rem;
   display: flex;
 }
 
-/* The actual card */
+/* Base Card */
 .card {
   background: var(--surface-elevated);
   border: 1px solid var(--surface-border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl, 24px);
   padding: 2.25rem;
   height: 100%;
   width: 100%;
@@ -45,16 +77,152 @@
   position: relative;
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  transition: all var(--transition-normal);
+  transition: all 260ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(99, 102, 241, 0.35);
+  transform: translateY(-6px);
   box-shadow: var(--shadow-hover);
 }
 
-/* Card top bar */
+/* ---------------------------------------------------------
+   Theme Accents (Distinct identity for each of the 4 modules)
+   --------------------------------------------------------- */
+/* Module 1: Cyber Blue / Indigo */
+.modTheme1:hover {
+  border-color: rgba(99, 102, 241, 0.6);
+  box-shadow: 0 16px 40px -6px rgba(99, 102, 241, 0.25);
+}
+.modTheme1 .cardBadge {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+[data-theme='dark'] .modTheme1 .cardBadge {
+  color: #818cf8;
+}
+.modTheme1 .iconBox {
+  background: rgba(99, 102, 241, 0.1);
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.25);
+}
+[data-theme='dark'] .modTheme1 .iconBox {
+  color: #818cf8;
+}
+.modTheme1:hover .iconBox {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+}
+.modTheme1 .cardLink {
+  color: #4f46e5;
+}
+[data-theme='dark'] .modTheme1 .cardLink {
+  color: #818cf8;
+}
+
+/* Module 2: Purple / Violet */
+.modTheme2:hover {
+  border-color: rgba(168, 85, 247, 0.6);
+  box-shadow: 0 16px 40px -6px rgba(168, 85, 247, 0.25);
+}
+.modTheme2 .cardBadge {
+  background: rgba(168, 85, 247, 0.1);
+  color: #7c3aed;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+[data-theme='dark'] .modTheme2 .cardBadge {
+  color: #c084fc;
+}
+.modTheme2 .iconBox {
+  background: rgba(168, 85, 247, 0.1);
+  color: #7c3aed;
+  border-color: rgba(168, 85, 247, 0.25);
+}
+[data-theme='dark'] .modTheme2 .iconBox {
+  color: #c084fc;
+}
+.modTheme2:hover .iconBox {
+  background: #8b5cf6;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.45);
+}
+.modTheme2 .cardLink {
+  color: #7c3aed;
+}
+[data-theme='dark'] .modTheme2 .cardLink {
+  color: #c084fc;
+}
+
+/* Module 3: Emerald / Neon Green */
+.modTheme3:hover {
+  border-color: rgba(16, 185, 129, 0.6);
+  box-shadow: 0 16px 40px -6px rgba(16, 185, 129, 0.25);
+}
+.modTheme3 .cardBadge {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+[data-theme='dark'] .modTheme3 .cardBadge {
+  color: #34d399;
+}
+.modTheme3 .iconBox {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+[data-theme='dark'] .modTheme3 .iconBox {
+  color: #34d399;
+}
+.modTheme3:hover .iconBox {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.45);
+}
+.modTheme3 .cardLink {
+  color: #059669;
+}
+[data-theme='dark'] .modTheme3 .cardLink {
+  color: #34d399;
+}
+
+/* Module 4: Rose / Amber */
+.modTheme4:hover {
+  border-color: rgba(244, 63, 94, 0.6);
+  box-shadow: 0 16px 40px -6px rgba(244, 63, 94, 0.25);
+}
+.modTheme4 .cardBadge {
+  background: rgba(244, 63, 94, 0.1);
+  color: #e11d48;
+  border-color: rgba(244, 63, 94, 0.25);
+}
+[data-theme='dark'] .modTheme4 .cardBadge {
+  color: #fb7185;
+}
+.modTheme4 .iconBox {
+  background: rgba(244, 63, 94, 0.1);
+  color: #e11d48;
+  border-color: rgba(244, 63, 94, 0.25);
+}
+[data-theme='dark'] .modTheme4 .iconBox {
+  color: #fb7185;
+}
+.modTheme4:hover .iconBox {
+  background: #f43f5e;
+  color: #ffffff;
+  box-shadow: 0 4px 16px rgba(244, 63, 94, 0.45);
+}
+.modTheme4 .cardLink {
+  color: #e11d48;
+}
+[data-theme='dark'] .modTheme4 .cardLink {
+  color: #fb7185;
+}
+
+/* ---------------------------------------------------------
+   Card Header
+   --------------------------------------------------------- */
 .cardHeader {
   display: flex;
   align-items: center;
@@ -62,117 +230,120 @@
   margin-bottom: 1.5rem;
 }
 
-/* Badge */
+.headerBadges {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
 .cardBadge {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
   padding: 0.35rem 0.8rem;
   border-radius: var(--radius-full);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--ifm-color-primary);
-  background: var(--ifm-color-primary-lightest);
-  border: 1px solid rgba(67, 56, 202, 0.12);
+  border: 1px solid transparent;
 }
 
-[data-theme='dark'] .cardBadge {
-  background: rgba(99, 102, 241, 0.12);
-  border-color: rgba(99, 102, 241, 0.25);
-  color: #a5b4fc;
+.levelBadge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ifm-font-color-secondary);
 }
 
-/* Icon Box */
+.durationBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--ifm-font-color-secondary);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--surface-border);
+  padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-full);
+}
+
+.metaIcon {
+  width: 13px;
+  height: 13px;
+  opacity: 0.75;
+}
+
+/* Title Row */
+.titleRow {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .iconBox {
-  width: 46px;
-  height: 46px;
+  width: 48px;
+  height: 48px;
   border-radius: var(--radius-md);
-  background: var(--ifm-color-primary-lightest);
-  border: 1px solid rgba(67, 56, 202, 0.15);
+  border: 1px solid transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--ifm-color-primary);
-  transition: all var(--transition-normal);
-}
-
-[data-theme='dark'] .iconBox {
-  background: rgba(99, 102, 241, 0.12);
-  border-color: rgba(99, 102, 241, 0.25);
-  color: #818cf8;
-}
-
-.card:hover .iconBox {
-  transform: scale(1.08);
-  background: var(--ifm-color-primary);
-  color: #ffffff;
-  border-color: var(--ifm-color-primary);
-  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.35);
+  flex-shrink: 0;
+  transition: all 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .cardIcon {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
-/* Title */
 .cardTitle {
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 0.75rem;
+  letter-spacing: -0.025em;
+  margin: 0;
   color: var(--ifm-font-color-base);
-  line-height: 1.35;
+  line-height: 1.3;
 }
 
-/* Description */
 .cardDesc {
   font-size: 0.95rem;
   color: var(--ifm-font-color-secondary);
-  line-height: 1.6;
+  line-height: 1.65;
   margin-bottom: 1.5rem;
   flex-grow: 1;
 }
 
-/* Checklist / pills */
+/* Bullets */
 .cardBullets {
   list-style: none;
   padding: 0;
   margin: 0 0 1.75rem 0;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
 .cardBulletItem {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  font-size: 0.8rem;
+  gap: 0.55rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--ifm-font-color-secondary);
-  background: var(--ifm-background-surface-color);
-  border: 1px solid var(--surface-border);
-  padding: 0.3rem 0.7rem;
-  border-radius: var(--radius-sm);
-  transition: border-color var(--transition-fast), color var(--transition-fast);
-}
-
-.cardBulletItem:hover {
-  border-color: rgba(99, 102, 241, 0.4);
-  color: var(--ifm-font-color-base);
 }
 
 .bulletCheck {
-  width: 14px;
-  height: 14px;
-  margin-right: 0.4rem;
+  width: 15px;
+  height: 15px;
   color: #10b981;
   flex-shrink: 0;
 }
 
-/* Footer / CTA */
+/* Footer Link */
 .cardFooter {
   margin-top: auto;
   padding-top: 1.25rem;
@@ -182,15 +353,23 @@
 .cardLink {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.92rem;
+  gap: 0.5rem;
+  font-size: 0.94rem;
   font-weight: 600;
-  color: var(--ifm-color-primary);
   text-decoration: none !important;
-  transition: gap var(--transition-fast);
+  transition: gap 180ms ease, transform 180ms ease;
 }
 
-.cardLink:hover {
-  color: var(--ifm-color-primary-dark);
-  gap: 0.65rem;
+.card:hover .cardLink {
+  gap: 0.75rem;
+}
+
+.arrowIcon {
+  width: 16px;
+  height: 16px;
+  transition: transform 180ms ease;
+}
+
+.card:hover .arrowIcon {
+  transform: translateX(3px);
 }
