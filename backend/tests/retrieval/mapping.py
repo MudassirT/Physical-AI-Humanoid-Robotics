@@ -10,7 +10,7 @@
 def get_url_for_chunk(chunk_id: str) -> str | None:
     """
     Placeholder function for mapping a chunk ID to its source URL.
-    
+
     Currently not used.
     """
     # In a more complex scenario, this could query a database:

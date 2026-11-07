@@ -12,7 +12,7 @@ def get_qdrant_client():
 
     Returns:
         QdrantClient: An instance of the Qdrant client.
-    
+
     Raises:
         ValueError: If QDRANT_URL or QDRANT_API_KEY environment variables are not set.
     """
