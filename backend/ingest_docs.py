@@ -16,13 +16,14 @@ from pathlib import Path
 backend_dir = Path(__file__).resolve().parent
 sys.path.insert(0, str(backend_dir))
 
+from qdrant_client import models
+
 from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.models import Document
 from app.services.embedding import EmbeddingGenerator
 from app.services.text_processor import TextProcessor
 from app.services.vector_store import VectorStore
-from qdrant_client import models
 
 logger = get_logger(__name__)
 
