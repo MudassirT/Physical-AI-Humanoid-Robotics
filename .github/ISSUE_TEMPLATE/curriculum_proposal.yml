@@ -1,0 +1,52 @@
+name: Curriculum Chapter Proposal
+description: Propose a new chapter, deep-dive derivation, or hands-on laboratory for the curriculum.
+title: "[PROPOSAL]: "
+labels: ["curriculum", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for proposing an addition or improvement to the **Physical AI & Humanoid Robotics** curriculum!
+  - type: dropdown
+    id: module
+    attributes:
+      label: Target Module
+      description: Which module does this proposed chapter belong to?
+      options:
+        - "Module 1: The Robotic Nervous System (ROS 2)"
+        - "Module 2: The Digital Twin (Gazebo & Unity)"
+        - "Module 3: The AI Robot Brain (NVIDIA Isaac & Nav2)"
+        - "Module 4: Vision-Language-Action (VLA) & Cognitive Robotics"
+        - "Cross-Cutting / Mathematical Foundations"
+    validations:
+      required: true
+  - type: textarea
+    id: chapter-outline
+    attributes:
+      label: Proposed Chapter Title and Technical Abstract
+      description: Provide an outline of theoretical derivations, robotics hardware grounding, and code examples.
+      placeholder: |
+        ### Title: Whole-Body Dynamic Push Recovery via Capture Point Quadratic Programming
+        ### Abstract:
+        Detailed mathematical derivation of instantaneous Capture Point (ICP) and divergent component of motion (DCM)...
+    validations:
+      required: true
+  - type: textarea
+    id: hardware-relevance
+    attributes:
+      label: Target Hardware Reference Platforms
+      description: Which real-world humanoid platforms or sensors does this apply to?
+      placeholder: "Tesla Optimus Gen 2, Figure 02, Unitree G1, Boston Dynamics Atlas Electric"
+  - type: checkboxes
+    id: deliverables
+    attributes:
+      label: Expected Chapter Deliverables
+      options:
+        - label: Theoretical mathematical derivation with LaTeX formulas
+          required: true
+        - label: High-information Mermaid architecture or sequence diagram
+          required: true
+        - label: Working C++20 or Python 3.12 ROS 2 code implementation
+          required: true
+        - label: Ingestable markdown (.mdx) formatted for RAG indexing
+          required: true
