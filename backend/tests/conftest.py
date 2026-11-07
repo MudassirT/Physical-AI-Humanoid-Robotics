@@ -7,8 +7,8 @@ Fixtures defined here are available to all tests without explicit import.
 import os
 from unittest.mock import patch
 
-from dotenv import load_dotenv
 import pytest
+from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
 load_dotenv()
