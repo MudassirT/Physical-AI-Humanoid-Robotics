@@ -5,6 +5,7 @@
 **An Encyclopedic Graduate Curriculum and Autonomous RAG Architecture for Embodied Intelligence**
 
 [![CI Status](https://img.shields.io/badge/CI-Passing-brightgreen?style=flat-square&logo=githubactions)](https://github.com/MudassirT/Physical-AI-Humanoid-Robotics/actions)
+[![CodeQL](https://img.shields.io/badge/Security-CodeQL_Passing-blue?style=flat-square&logo=github)](.github/workflows/codeql.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Docusaurus v3](https://img.shields.io/badge/Docusaurus-3.10-success?style=flat-square&logo=docusaurus)](https://docusaurus.io/)
 [![Python 3.13](https://img.shields.io/badge/Python-3.13-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
@@ -20,6 +21,7 @@
   <a href="#-quickstart">Quickstart</a> •
   <a href="#-docker-deployment">Docker</a> •
   <a href="#-rag-assistant-api">RAG Agent</a> •
+  <a href="#-telemetry--benchmarks">Benchmarks</a> •
   <a href="#-contributing">Contributing</a>
 </p>
 
@@ -37,7 +39,7 @@ Every chapter features dense theoretical derivations, high-information Mermaid a
 
 ---
 
-## 🏗️ System Architecture
+## 🏛️ System Architecture
 
 The platform is structured into two tightly coupled subsystems: the **Docusaurus Interactive Textbook** and the **FastAPI + Qdrant Autonomous RAG Service**:
 
@@ -45,8 +47,10 @@ The platform is structured into two tightly coupled subsystems: the **Docusaurus
 flowchart TD
     subgraph Client ["Client Presentation Tier (Docusaurus v3)"]
         UI["Interactive Textbook UI<br/>(TypeScript / React / MDX)"]
-        Chat["Floating RAG ChatWidget<br/>(Light/Dark Adaptive)"]
+        Chat["Floating RAG Assistant<br/>(Light/Dark Adaptive)"]
+        Bar["Reading Progress Bar<br/>(60 FPS Hardware-Accelerated)"]
         UI --- Chat
+        UI --- Bar
     end
 
     subgraph Gateway ["API Tier (FastAPI / Uvicorn)"]
@@ -91,13 +95,14 @@ The textbook is divided into **4 Core Modules** spanning **26 Chapters**:
 ### [Module 1: The Robotic Nervous System (ROS 2)](ai-book-docs/module1-ros2/1-1-introduction.mdx)
 * **DDS RTPS Middleware**: Discovery, distributed topologies, and 1 kHz sub-millisecond jitter budgets.
 * **Nodes, Topics & Zero-Copy IPC**: Multi-threaded callback groups, DDS QoS policies, and **Eclipse Iceoryx** shared-memory exchange.
-* **Services, Actions & Parameters**: Preemptible bipedal step state machines, atomic parameter validation callbacks.
-* **Real-Time Benchmarking**: `rclcpp` vs `rclpy`, Linux `PREEMPT_RT` kernel configurations, memory locking (`mlockall`), and SROS2 security profiles.
+* **Services, Actions & Parameters**: Preemptible long-horizon actions, deadlock avoidance, and dynamic parameter servers.
+* **Modern C++20 Node Implementation**: Composition with `rclcpp_components`, memory-bounded ring buffers, and hard real-time executors.
+* **Capstone Project**: Production humanoid joint trajectory controller with emergency stop latching and zero-copy telemetry.
 
 ### [Module 2: The Digital Twin (Gazebo & Unity)](ai-book-docs/module2-digital-twin/2-1-introduction-to-digital-twins.mdx)
-* **Floating-Base Underactuated Dynamics**: Spatial inertia matrices, Featherstone Articulated Body Algorithm (ABA), and LCP contact solvers.
-* **Physics Engine Benchmarking**: Gazebo Harmonic (DART) vs NVIDIA PhysX 5.4 vs MuJoCo.
-* **Stochastic Sensor Simulation**: IMU random walk and Allan variance modeling, 6-axis foot force-torque load cells, and LiDAR ray-tracing.
+* **Physics & Kinematics Modeling**: Parametric URDF/SDF/Xacro trees, Featherstone Articulated Body Algorithm (ABA), and friction cone contact mechanics.
+* **Gazebo Harmonic Sim**: Multi-rate physics stepping (1 kHz dynamics vs 60 Hz rendering), ODE/Bullet/DART solvers, and `ros2_control` hardware interfaces.
+* **Synthetic Sensor Simulation**: IMU thermal drift and Allan variance modeling, 6-axis foot force-torque load cells, and LiDAR ray-tracing.
 * **Unity HDRP Co-Simulation**: ROS-TCP-Connector bridging, synthetic semantic segmentation, and domain randomization.
 * **Capstone Project**: Parametric Xacro biped model (`humanoid_biped.urdf.xacro`) with 100 N impulse push recovery.
 
@@ -177,17 +182,17 @@ curl -X POST "http://127.0.0.1:8000/ask" \
 ### Sample Response
 ```json
 {
-  "answer_text": "The Capture Point (CP) equation used in bipedal locomotion is:\n\nx_CP = x_CoM + (v_CoM / omega_0)\n\nWhere:\n* x_CP is the Capture Point.\n* x_CoM is the Center of Mass position.\n* v_CoM is the Center of Mass velocity.\n* omega_0 = sqrt(g / z_CoM) is the natural frequency.\n\nSource: /ai-book/module3-ai-robot-brain/3-5-hands-on-exercises.mdx",
+  "answer_text": "The Capture Point (CP) equation used in bipedal locomotion is:\n\nx_CP = x_CoM + (v_CoM / omega_0)\n\nWhere:\n* x_CP is the Capture Point.\n* x_CoM is the Center of Mass position.\n* v_CoM is the Center of Mass velocity.\n* omega_0 = sqrt(g / z_CoM) is the natural frequency.\n\nSource: /ai-book/module3-ai-robot-brain/3-5-hands-on-exercises",
   "retrieved_sources": [
-    "/ai-book/module3-ai-robot-brain/3-5-hands-on-exercises.mdx",
-    "/ai-book/module3-ai-robot-brain/3-4-nav2-for-bipedal-movement.mdx"
+    "/ai-book/module3-ai-robot-brain/3-5-hands-on-exercises",
+    "/ai-book/module3-ai-robot-brain/3-4-nav2-for-bipedal-movement"
   ]
 }
 ```
 
 ---
 
-## 📊 Performance & Telemetry Benchmarks
+## 📊 Telemetry & Benchmarks
 
 | Component | Target Spec | Measured Real-Time Metric |
 | :--- | :--- | :--- |
@@ -196,6 +201,7 @@ curl -X POST "http://127.0.0.1:8000/ask" \
 | **End-to-End RAG Query** | `< 2.5 s` | `1.4 s` (Gemini 2.5 Flash) |
 | **Frontend Static Build** | Zero Errors | `34 static routes compiled in 8.2s` |
 | **Theme Toggle Response** | Synchronous | `Immediate (< 16 ms / 1 frame)` |
+| **Reading Bar Latency** | 60 FPS | `0ms React re-render (direct transform)` |
 
 ---
 
