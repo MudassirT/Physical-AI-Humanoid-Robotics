@@ -1,0 +1,23 @@
+.progressBarContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 3px;
+  z-index: 99999;
+  background: transparent;
+  pointer-events: none;
+}
+
+.progressBarFill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 35%, #06b6d4 70%, #10b981 100%);
+  box-shadow: 0 0 12px rgba(99, 102, 241, 0.7), 0 0 4px rgba(6, 182, 212, 0.5);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity 160ms ease, transform 60ms linear;
+  will-change: transform;
+}
