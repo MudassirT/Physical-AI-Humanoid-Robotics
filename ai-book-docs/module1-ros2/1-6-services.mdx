@@ -21,7 +21,7 @@ sequenceDiagram
     DDS->>Server: Dispatch Request Callback
     Note over Server: Verify Actuator Current = 0.0 A (Safety Interlock)
     Server->>Motor: Engage index-pulse calibration routine
-    Motor-->>Server: Index pulses verified; optical home set
+    Motor-->>Server: Index pulses verified - optical home set
     Server->>DDS: Return Response: {success: true, calibrated_joints: 4}
     DDS->>Client: Resolve std::future / Trigger Async Callback
     Note over Client: Transition state machine to "Ready to Walk"
