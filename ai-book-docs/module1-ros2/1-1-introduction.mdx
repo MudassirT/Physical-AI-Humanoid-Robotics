@@ -135,7 +135,7 @@ sequenceDiagram
     Note over RTKernel: Non-RT Memory Allocation (malloc) causes Page Fault!
     RTKernel-->>RTKernel: Delayed execution... (1.45 ms elapsed)
     Solver->>Actuator: Late torque dispatch (Missed Deadline!)
-    Note over Actuator: Motor executes stale command; Foot slips!
+    Note over Actuator: Motor executes stale command - Foot slips!
     end
 ```
 
