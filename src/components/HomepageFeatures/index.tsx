@@ -63,8 +63,29 @@ function BulletCheckIcon() {
   );
 }
 
+function ClockIcon() {
+  return (
+    <svg className={styles.metaIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  );
+}
+
+function ArrowRightIcon() {
+  return (
+    <svg className={styles.arrowIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
+    </svg>
+  );
+}
+
 type FeatureItem = {
   num: string;
+  themeClass: string;
+  level: string;
+  duration: string;
   icon: ReactNode;
   title: string;
   description: ReactNode;
@@ -75,72 +96,97 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     num: '01',
+    themeClass: styles.modTheme1,
+    level: 'LEVEL 1 • MIDDLEWARE',
+    duration: '3.5 Hrs',
     icon: <NervousSystemIcon />,
-    title: 'Module 1: The Robotic Nervous System (ROS 2)',
+    title: 'The Robotic Nervous System (ROS 2)',
     description: (
       <>
-        Master the Robot Operating System (ROS 2) middleware layer, DDS communication,
-        modular node graphs, and real-time control for humanoid hardware.
+        Master the deterministic middleware layer, DDS QoS policies, real-time lifecycle nodes,
+        and zero-copy IPC designed for sub-millisecond humanoid joint motor commutation.
       </>
     ),
-    bullets: ['Nodes & Topics', 'DDS & QoS Policies', 'Services & Actions', 'RCLPY Architecture'],
+    bullets: ['Deterministic DDS & QoS Policies', 'Iceoryx Shared Memory IPC', 'Services, Actions & Parameters', 'rclpy & rclcpp Architecture'],
     to: '/ai-book/module1-ros2/1-1-introduction',
   },
   {
     num: '02',
+    themeClass: styles.modTheme2,
+    level: 'LEVEL 2 • SIMULATION',
+    duration: '4.0 Hrs',
     icon: <DigitalTwinIcon />,
-    title: 'Module 2: The Digital Twin (Gazebo & Unity)',
+    title: 'The Digital Twin (Gazebo & Unity)',
     description: (
       <>
-        Build physically accurate virtual replicas of bipedal humanoid robots in Gazebo
-        and photorealistic rendering environments in the Unity Engine.
+        Build high-fidelity physics replicas in Gazebo Harmonic and photorealistic sensor rendering
+        in Unity HDRP to close the sim-to-real gap before deploying to physical robot hardware.
       </>
     ),
-    bullets: ['Gazebo Physics', 'URDF & SDF Modeling', 'Sensor Simulation', 'Unity Robotics Hub'],
+    bullets: ['Rigid-Body & Multi-Contact Physics', 'URDF, Xacro & SDF Modeling', 'IMU & Stereo Camera Sensor Sim', 'Unity Robotics Hub & ROS TCP'],
     to: '/ai-book/module2-digital-twin/2-1-introduction-to-digital-twins',
   },
   {
     num: '03',
+    themeClass: styles.modTheme3,
+    level: 'LEVEL 3 • PERCEPTION',
+    duration: '4.5 Hrs',
     icon: <RobotBrainIcon />,
-    title: 'Module 3: The AI-Robot Brain (NVIDIA Isaac)',
+    title: 'The AI-Robot Brain (NVIDIA Isaac)',
     description: (
       <>
-        Deploy hardware-accelerated perception pipelines with NVIDIA Isaac ROS, generate
-        photorealistic synthetic data in Isaac Sim, and integrate Nav2 for bipedal locomotion.
+        Harness GPU-accelerated Isaac ROS, TensorRT perception pipelines, photorealistic synthetic
+        data generation in Isaac Sim, and Nav2 footstep lattice planning for bipedal traversal.
       </>
     ),
-    bullets: ['Isaac Sim & Synthetic Data', 'Isaac ROS Visual SLAM', 'TensorRT Inference', 'Nav2 Bipedal Planning'],
+    bullets: ['Isaac Sim & Synthetic Data Generation', 'NITROS Zero-Copy Pipelines', 'cuVSLAM Visual-Inertial Odometry', 'Nav2 Bipedal Footstep Lattice'],
     to: '/ai-book/module3-ai-robot-brain/3-1-introduction-to-isaac-platform',
   },
   {
     num: '04',
+    themeClass: styles.modTheme4,
+    level: 'LEVEL 4 • EMBODIED COGNITION',
+    duration: '5.0 Hrs',
     icon: <VLAIcon />,
-    title: 'Module 4: Vision-Language-Action (VLA)',
+    title: 'Vision-Language-Action (VLA)',
     description: (
       <>
-        Bridge natural language intent to embodied robotic actions. Integrate multimodal
-        foundation models and LLM cognitive planners for voice-to-action humanoid manipulation.
+        Bridge natural language intent to embodied robotic actions. Integrate multimodal foundation
+        models, Whisper voice pipelines, and LLM hierarchical planners for autonomous humanoid tasks.
       </>
     ),
-    bullets: ['VLA Architecture', 'Voice-to-Action Pipeline', 'Cognitive Planning', 'Multimodal Grounding'],
+    bullets: ['End-to-End VLA Architectures (OpenVLA)', 'Whisper Voice-to-Action Pipeline', 'LLM Hierarchical Cognitive Planning', '3D Affordance & Spatial Grounding'],
     to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
   },
 ];
 
-function Feature({ num, icon, title, description, bullets, to }: FeatureItem) {
+function Feature({ num, themeClass, level, duration, icon, title, description, bullets, to }: FeatureItem) {
   return (
-    <div className={clsx('col col--6', styles.featureCard)}>
-      <div className={styles.card}>
+    <div className={clsx('col col--6', styles.featureCol)}>
+      <div className={clsx(styles.card, themeClass)}>
+        {/* Top Meta Bar */}
         <div className={styles.cardHeader}>
-          <span className={styles.cardBadge}>Module {num}</span>
-          <div className={styles.iconBox}>
-            {icon}
+          <div className={styles.headerBadges}>
+            <span className={styles.cardBadge}>Module {num}</span>
+            <span className={styles.levelBadge}>{level}</span>
+          </div>
+          <div className={styles.durationBadge}>
+            <ClockIcon />
+            <span>{duration}</span>
           </div>
         </div>
 
-        <Heading as="h3" className={styles.cardTitle}>{title}</Heading>
+        {/* Icon & Title */}
+        <div className={styles.titleRow}>
+          <div className={styles.iconBox}>
+            {icon}
+          </div>
+          <Heading as="h3" className={styles.cardTitle}>{title}</Heading>
+        </div>
+
         <p className={styles.cardDesc}>{description}</p>
 
+        {/* Key Pillars Checklist */}
         <ul className={styles.cardBullets}>
           {bullets.map((b) => (
             <li key={b} className={styles.cardBulletItem}>
@@ -150,9 +196,11 @@ function Feature({ num, icon, title, description, bullets, to }: FeatureItem) {
           ))}
         </ul>
 
+        {/* Action Link */}
         <div className={styles.cardFooter}>
           <Link className={styles.cardLink} to={to}>
-            Explore Module {num} →
+            <span>Explore Module {num}</span>
+            <ArrowRightIcon />
           </Link>
         </div>
       </div>
@@ -164,11 +212,17 @@ export default function HomepageFeatures(): ReactNode {
   return (
     <section id="curriculum-modules" className={styles.features}>
       <div className="container">
+        {/* Section Pill */}
+        <div className={styles.sectionBadge}>
+          <span className={styles.sectionBadgeDot} />
+          SYSTEMATIC ENGINEERING CURRICULUM
+        </div>
+
         <Heading as="h2" className={styles.sectionTitle}>
-          Curriculum Modules
+          Four Pillars of Embodied Intelligence
         </Heading>
         <p className={styles.sectionSubtitle}>
-          Four comprehensive engineering units designed to transition your skills from robotics fundamentals to autonomous embodied AI.
+          An end-to-end engineering journey transitioning your capabilities from low-level deterministic motor communication to autonomous multimodal humanoid behavior.
         </p>
 
         <div className="row">
