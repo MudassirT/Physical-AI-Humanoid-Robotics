@@ -103,4 +103,31 @@ Modern humanoids utilize solid-state or spinning LiDARs (e.g., Livox Mid-360) an
 | **Stereo Depth Optics** | Binocular disparity matching using active infrared speckle projection | Specular reflections on polished floors; transparent glass absorption; flying pixels at sharp depth discontinuities. |
 | **3D Solid-State LiDAR** | GPU-accelerated ray tracing calculating time-of-flight distance | Beam divergence spot size; grazing-angle dropouts; low-albedo black rubber absorption. |
 
+---
+
+## 4. Allan Variance & Stochastic IMU Noise Modeling
+
+To achieve zero sim-to-real gap in state estimation, IMU noise cannot be simulated as simple white Gaussian noise. Tactical IMUs (e.g., ADIS16470 / ICM-42688-P) exhibit three distinct stochastic regimes characterized by the **Allan Variance** curve `sigma^2(tau)`:
+
+```mermaid
+graph LR
+    subgraph AllanVarianceRegions["Allan Variance Curve Regimes"]
+        VRW["1. Velocity Random Walk (White Noise)\nSlope: -1/2\nGoverns short-term integration error"]
+        BI["2. Bias Instability (Flicker Noise)\nSlope: 0 (Minimum)\nDefines optimal Kalman filter gyro bias stability"]
+        RRW["3. Rate Random Walk (Brownian Drift)\nSlope: +1/2\nDominates long-term integration divergence"]
+    end
+
+    VRW --> BI
+    BI --> RRW
+```
+
+In the digital twin, the discrete-time sensor state `omega_meas(k)` updates according to:
+
+```text
+omega_meas(k) = omega_true(k) + b_gyro(k) + w_gyro(k)
+b_gyro(k+1) = b_gyro(k) + w_bias(k) * dt
+```
+
+where `w_gyro ~ N(0, sigma_w^2 / dt)` and `w_bias ~ N(0, sigma_b^2 * dt)`. This accurately forces the humanoid state estimator to continuously track and estimate gyro bias drift online.
+
 In the next chapter, we connect high-fidelity rendering engines: **Unity HDRP, Photorealism, and the ROS-TCP-Connector**.
