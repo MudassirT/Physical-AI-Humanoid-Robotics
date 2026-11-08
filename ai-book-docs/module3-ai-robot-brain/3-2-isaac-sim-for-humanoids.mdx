@@ -128,4 +128,15 @@ with rep.new_layer():
         rep.randomizer.color(colors=rep.distribution.uniform((0.2, 0.2, 0.2), (1.0, 1.0, 1.0)))
 ```
 
+---
+
+## 4. PhysX 5 Reduced Coordinate Articulations
+
+Standard physics engines model robotic links as disconnected rigid bodies held together by bilateral spring constraints (maximal coordinates). When simulating a 30-DOF humanoid, joint constraint forces fight each other, causing **joint spongy stretching** and numerical instability.
+
+Isaac Sim uses **PhysX 5 Reduced Coordinate Articulations (RCAs)**:
+- Joint positions are parameterized strictly in the minimal generalized coordinate space `q in R^n`.
+- Joint constraints are satisfied analytically by construction: zero joint stretching is mathematically guaranteed.
+- Supports high mass-ratio linkages (e.g., a 25 kg torso connected to a 0.2 kg finger link) with rock-solid numerical stability at 1,000 Hz.
+
 In the next chapter, we deploy these accelerated perception pipelines onto physical hardware: **Isaac ROS, NITROS, and cuVSLAM**.
