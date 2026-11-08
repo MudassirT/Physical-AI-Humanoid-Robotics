@@ -191,6 +191,18 @@ Because deep neural policies can hallucinate out-of-distribution actions, the ou
 
 ---
 
+## 5. Architectural Comparison: Frontier Robot Foundation Models
+
+| Model Architecture | Organization | Parameter Size | Action Generation Paradigm | Control Frequency | Primary Strength |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **RT-2** | Google DeepMind | 55B (PaLM-E / PaLI-X) | Autoregressive token discretization (256 bins) | 3–5 Hz | Web-scale semantic knowledge |
+| **OpenVLA** | Stanford / Berkeley | 7B (Llama-2 / Prismatic) | Autoregressive token discretization | 5–8 Hz | 100% open-source weights & fine-tuning |
+| **Octo** | UC Berkeley / Stanford | 93M (Diffusion Transformer) | Score-based Denoising Diffusion (DDPM) | 10–20 Hz | Lightweight; multi-embodiment adapter |
+| **pi_0 (π0)** | Physical Intelligence | ~3B (PaliGemma backbone) | Continuous Flow Matching (Conditional Flow) | **50 Hz** | High-precision dexterous manipulation |
+| **Project GR00T** | NVIDIA | Dual-Tower Multimodal | Flow Matching + Dual-Arm Retargeting | 30–50 Hz | Native humanoid whole-body integration |
+
+---
+
 ## Summary
 
 Vision-Language-Action systems represent the convergence of multimodal AI and physical control. By understanding the progression from modular LLM planners (SayCan) to discretized tokenizers (OpenVLA) and continuous flow-matching policies (pi_0), engineers can architect humanoid control systems that balance open-world semantic comprehension with sub-millisecond physical stability.
