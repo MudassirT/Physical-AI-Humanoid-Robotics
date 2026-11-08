@@ -225,6 +225,23 @@ If an LLM hallucinates an aggressive motion that violates any of these physical 
 
 ---
 
+## 5. Mathematical SayCan Scoring: Semantic vs. Affordance Fusion
+
+The fundamental mathematical formulation of grounded cognitive planning (Ahn et al., Google DeepMind) chooses optimal skill `a*` at step `t` by maximizing the product of semantic probability and physical value affordance:
+
+```text
+a*_t = argmax_{a in A} [ P_LLM(a | instruction, past_steps)^alpha * V_affordance(a | current_observation)^beta ]
+```
+
+where:
+- `P_LLM(a | ...)` represents the linguistic prior of how logically sound the subtask is given the high-level goal.
+- `V_affordance(a | s)` represents the learned value function (trained via Q-learning) estimating the probability that skill `a` can succeed given current physical reality.
+- `alpha, beta` balance common-sense reasoning versus physical feasibility.
+
+If a human asks to `"Pick up a can of soda"`, but the soda can is in a closed refrigerator, `V_affordance(pick_can | s) approx 0`. The system automatically selects `open_fridge` because its combined score is maximized.
+
+---
+
 ## Summary
 
 Cognitive planning with LLMs transforms humanoid robots from pre-programmed automations into adaptable agents. By combining high-level semantic reasoning with **SayCan affordance grounding**, **dynamic Behavior Trees**, **Code-as-Policies execution**, and **formal invariant safety shields**, robotics engineers achieve the optimal compromise between open-world intelligence and absolute physical safety.
