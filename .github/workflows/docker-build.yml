@@ -42,3 +42,4 @@ jobs:
           file: ./backend/Dockerfile
           push: false
           tags: physical-ai-backend:test
+
