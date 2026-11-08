@@ -85,7 +85,7 @@ flowchart TD
 
 ## 📚 Curriculum Overview
 
-The textbook is divided into **4 Core Modules** spanning **26 Chapters**:
+The textbook is divided into **5 Core Modules** spanning **36 Chapters**:
 
 ### [Introduction: The Physical AI Frontier](ai-book-docs/intro.mdx)
 * The Moravec's Paradox in contemporary AI.
@@ -118,6 +118,13 @@ The textbook is divided into **4 Core Modules** spanning **26 Chapters**:
 * **Cognitive Grounding**: SayCan affordance scoring, dynamic Behavior Tree synthesis, and closed-loop environmental reflection.
 * **Multimodal Interaction**: 3D deictic pointing ray casting, zero-shot 6-DoF pose estimation with **FoundationPose**, and active conversational disambiguation.
 * **Capstone Project**: End-to-end voice-commanded humanoid manipulation & navigation orchestrator.
+
+### [Module 5: Humanoid Kinematics & Dynamics](ai-book-docs/module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics.mdx)
+* **Coordinate Geometry on SE(3)**: Lie groups, quaternions, SLERP geodesic curves, and Product of Exponentials (PoE).
+* **Multi-Body Dynamics**: Linear-time Recursive Newton-Euler Algorithm (RNEA), Composite Rigid Body (CRBA), and Featherstone Articulated Body Algorithm (ABA).
+* **Spatial Vector Mechanics**: 6D motion twists, force wrenches, and Plücker coordinate transformation matrices.
+* **Floating-Base & Centroidal Dynamics**: 6-DOF unactuated base constraints, Winter's anthropometrics, and Centroidal Momentum Matrix (CMM).
+* **Contact Physics & Real-Time Engines**: Coulomb friction cones, foot Center of Pressure (CoP) margins, and 1 kHz Pinocchio/Drake execution on Jetson AGX Orin.
 
 ---
 
