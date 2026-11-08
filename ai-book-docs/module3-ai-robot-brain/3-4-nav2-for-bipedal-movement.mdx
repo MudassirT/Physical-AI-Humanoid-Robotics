@@ -129,4 +129,23 @@ min_{ddq, tau, lambda} [
 
 Using modern real-time QP solvers such as **OSQP** or **qpOASES**, the solution `(ddq*, tau*, lambda*)` is found in under **0.5 milliseconds**, driving the physical joint motors directly.
 
+---
+
+## 4. 3D Elevation Mapping & Footstep Lattice Planning
+
+Unlike wheeled robots that navigate 2D costmaps, humanoids step over obstacles, ascend stairs, and traverse broken terrain using **3D Elevation Mapping** (`grid_map` / `elevation_mapping` ROS 2 package):
+
+```mermaid
+graph TD
+    Pointcloud["Raw 3D Pointcloud from RealSense / LiDAR"] --> GPUFilter["GPU Raycasting & Elevation Filter"]
+    GPUFilter --> ElevationMap["Multi-Layer 2.5D Elevation Grid\nLayers: height, variance, surface_normal_z, friction, step_height"]
+    
+    ElevationMap --> FootstepLattice["Footstep Lattice Planner (ARA* Search)\nEvaluates candidate foot placements based on slope & clearance"]
+    FootstepLattice --> FeasibleSteps["Discrete Footstep Sequence: [ (x_L, y_L, theta_L), (x_R, y_R, theta_R), ... ]"]
+    FeasibleSteps --> Nav2Biped["Nav2 Controller Server Dispatch to Whole-Body Controller"]
+```
+
+1. **Surface Normal Verification**: Every candidate footstep is validated: the surface normal must satisfy `n_z >= cos(20 deg)` to prevent foot slip on steep grades.
+2. **Step Height Discontinuity**: Curvature checks detect stair edges, ensuring the heel does not overhang stair nosing.
+
 In the next chapter, we synthesize these tools into a comprehensive hands-on project: **Autonomous Humanoid Goal Navigation with cuVSLAM and Nav2**.
