@@ -144,4 +144,18 @@ To eliminate latency and jitter, ROS 2 is architected to allow:
 - **Thread core pinning**: Pinning the high-frequency control executor to an isolated CPU core (`isolcpus`).
 - **POSIX RT priority**: Running node threads under `SCHED_FIFO` with priority 98.
 
+---
+
+## 4. Middleware Benchmark: ROS 2 vs. OROCOS vs. YARP
+
+In the history of robotics middleware, humanoids like Honda ASIMO, iCub, and HRP-4 originally explored specialized frameworks before the industry converged on ROS 2:
+
+| Metric / Dimension | OROCOS RTT | YARP (Yet Another Robot Platform) | ROS 2 (Humble / Iron) |
+| :--- | :--- | :--- | :--- |
+| **Primary Focus** | Hard real-time component framework for manipulators | Multi-device humanoid research (iCub platform) | Full-stack distributed autonomous physical AI |
+| **Underlying Wire Protocol** | CORBA / Custom IPC | Port-based TCP/UDP carrier connections | OMG standard DDS (RTPS wire spec) |
+| **Ecosystem & Community** | Highly academic; limited tooling | Robotics lab specific; niche hardware support | Global industry standard with NVIDIA, Amazon, and Tesla adoption |
+| **AI & Perception Bridges** | Difficult to interface with deep learning frameworks | Custom bindings for OpenCV/YOLO | Native zero-copy GPU memory exchange via NITROS |
+| **Real-Time Determinism** | Native hard real-time C++ components | Soft real-time on standard Linux kernels | Hard real-time capable via POSIX `PREEMPT_RT` and `rclcpp` |
+
 In the next chapter, we formalize the fundamental building blocks of this real-time system: **Nodes, Graphs, and Data Distribution Entities**.
