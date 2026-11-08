@@ -164,4 +164,18 @@ To test whether your digital twin's contact mechanics and friction cones are cor
    ```
 2. Observe the center of mass trajectory in RViz2: The ground reaction wrenches will shift toward the lateral edge of the support polygon, demonstrating active dynamic stabilization.
 
+---
+
+## 4. Laboratory Evaluation Rubric & Success Criteria
+
+To certify completion of Module 2, your digital twin implementation must satisfy the following automated test matrix:
+
+| Evaluation Criterion | Target Specification | Verification Command / Tool | Max Points |
+| :--- | :--- | :--- | :--- |
+| **URDF Kinematic Tree** | Valid tree topology with 0 circular loops | `check_urdf humanoid.urdf` | 20 pts |
+| **Physics Determinism** | 1 ms step time with zero physics solver explosion | `gz stats` (RTF >= 0.95) | 25 pts |
+| **Ground Contact Stability** | Foot penetration depth < 1 mm under 65 kg mass | `/humanoid/left_foot/wrench` echo | 25 pts |
+| **Disturbance Recovery** | Re-stabilize within 0.8 s following 100 N push | RViz2 CoM trajectory monitor | 30 pts |
+| **Total Passing Grade** | **>= 85 / 100 points** | Autonomous CI test harness | **100 pts** |
+
 With the physical digital twin verified, we proceed to **Module 3: Constructing the AI-Robot Brain using NVIDIA Isaac Sim, Isaac ROS, and Nav2 Bipedal Locomotion**.
