@@ -148,4 +148,21 @@ To control a humanoid model inside Gazebo Harmonic using standard ROS 2 controll
 </gazebo>
 ```
 
+---
+
+## 4. Contact Solvers: LCP and Projected Gauss-Seidel in DART
+
+In Gazebo Harmonic, rigid-body contact dynamics are solved as a **Linear Complementarity Problem (LCP)**:
+
+```text
+w = A * lambda + b >= 0,    lambda >= 0,    lambda^T * w = 0
+```
+
+where:
+- `lambda` are unilateral contact forces and frictional impulses.
+- `w` represents relative contact separation velocities.
+- `lambda^T * w = 0` enforces that normal contact force can only be non-zero when the bodies are touching (`w = 0`).
+
+DART utilizes **Projected Gauss-Seidel (PGS)** and Dantzig direct pivoting solvers. For bipedal balance with foot contacts, setting `iters = 50` in the physics configuration guarantees convergence and prevents foot penetration artifacts.
+
 In the next chapter, we simulate real-world physical sensors: **IMUs, Force-Torque Cells, LiDAR, and Depth Optics**.
