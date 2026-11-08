@@ -146,4 +146,32 @@ int main(int argc, char * argv[]) {
 }
 ```
 
+---
+
+## 5. Eclipse Iceoryx Shared Memory Architecture
+
+On a humanoid with stereo 4K RGB-D cameras (generating ~1.2 GB/s of raw uncompressed visual telemetry), standard network socket serialization causes severe CPU bottlenecks:
+
+```mermaid
+flowchart LR
+    subgraph TraditionalIPC["Traditional Sockets (Serialization Bottleneck)"]
+        direction TB
+        Pub1["Publisher Node"] -->|1. Serialize to CDR (CPU Copy)| Kernel1["OS Network Stack"]
+        Kernel1 -->|2. UDP Socket Buffer Copy| Kernel2["Loopback / Socket"]
+        Kernel2 -->|3. Deserialize from CDR (CPU Copy)| Sub1["Subscriber Node"]
+    end
+
+    subgraph IceoryxIPC["Eclipse Iceoryx Shared Memory (True Zero-Copy)"]
+        direction TB
+        Pub2["Publisher Node (Loaned Message)"]
+        MemPool["Shared Memory Segment /dev/shm (Pre-allocated Chunks)"]
+        Sub2["Subscriber Node"]
+
+        Pub2 -->|Direct Memory Write| MemPool
+        MemPool -->|Pointer Handoff via Unix Domain Socket (0 CPU Copies)| Sub2
+    end
+```
+
+By decoupling payload transfers into fixed-size shared memory memory pools (`RouDi` daemon), Iceoryx maintains a constant **sub-microsecond transmission latency** regardless of whether a message is an 8-byte encoder position or an 800 MB lidar point cloud.
+
 In the next chapter, we analyze discrete request-response primitives: **Services, Thread Starvation, and Reentrant Concurrency**.
