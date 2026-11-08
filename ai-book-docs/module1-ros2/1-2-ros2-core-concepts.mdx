@@ -154,4 +154,32 @@ ros2 topic info /sensors/imu/data_raw --verbose
 rqt_graph
 ```
 
+---
+
+## 5. RTPS Discovery Protocol: PDP and EDP Mechanisms
+
+Underneath ROS 2, the OMG Data Distribution Service Real-Time Publish-Subscribe (RTPS) wire protocol establishes communication autonomously without a central broker:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant NodeA as Node A (State Estimator)
+    participant Multicast as Multicast Discovery (239.255.0.1:7400)
+    participant NodeB as Node B (Whole-Body Controller)
+
+    Note over NodeA,NodeB: Phase 1: Participant Discovery Protocol (PDP)
+    NodeA->>Multicast: Broadcast SPDP Participant Data (GUID, Locators, QoS)
+    Multicast->>NodeB: Deliver Node A Participant Descriptor
+    NodeB->>NodeA: Unicast Acknowledgment & Node B Participant Descriptor
+
+    Note over NodeA,NodeB: Phase 2: Endpoint Discovery Protocol (EDP)
+    NodeA->>NodeB: SEDP Publication Data (Topic: /robot/joint_states, Type: sensor_msgs/JointState)
+    NodeB->>NodeA: SEDP Subscription Data (Topic: /robot/joint_states, Compatible QoS)
+    Note over NodeA,NodeB: Match Verified: Direct Peer-to-Peer Data Channel Established!
+```
+
+1. **Simple Participant Discovery Protocol (SPDP)**: Nodes periodically announce presence over UDP multicast port `7400 + 250 * domain_id`.
+2. **Simple Endpoint Discovery Protocol (SEDP)**: Once participants recognize each other, they exchange topic names, data types, and QoS contracts via unicast.
+3. **QoS RxO (Request vs. Offered) Compatibility**: If a subscriber requests `Reliable` reliability but a publisher offers `Best-Effort`, DDS refuses connection to preserve contractual safety.
+
 In the next chapter, we configure a deterministic build workspace and CMake pipeline engineered for high-performance humanoid packages.
