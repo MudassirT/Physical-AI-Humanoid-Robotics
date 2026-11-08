@@ -72,4 +72,18 @@ In 2024, NVIDIA unveiled **Project GR00T** (Generalist Robot 00 Technology), a m
 - Generate coordinated whole-body movements (dual-arm manipulation, torso posture adjustments, and bipedal footstep planning).
 - Transfer policies seamlessly across commercial humanoid platforms including **Figure 02**, **Unitree H1/G1**, **Boston Dynamics Atlas**, and **Sanctuary Phoenix**.
 
+---
+
+## 3. Edge Compute Silicon: Jetson AGX Orin vs. Jetson Thor
+
+To run the AI brain locally without relying on remote cloud connectivity, humanoids carry onboard AI supercomputers:
+
+| Specification / Platform | Jetson Orin Nano | Jetson AGX Orin (64GB) | Jetson Thor (Next-Gen) |
+| :--- | :--- | :--- | :--- |
+| **AI Inference Performance** | 40 TOPS (INT8) | 275 TOPS (INT8) | **1,000+ TOPS (FP4/FP8)** |
+| **GPU Architecture** | 1024-core Ampere | 2048-core Ampere + 64 Tensor Cores | Blackwell architecture + Transformer Engines |
+| **CPU Complex** | 6-core Arm Cortex-A78AE | 12-core Arm Cortex-A78AE | 14-core Neoverse-V3AE CPU |
+| **Memory Bandwidth** | 68 GB/s | 204.8 GB/s | **> 500 GB/s (LPDDR5X)** |
+| **Humanoid Application** | Gripper / Hand compute | Real-time SLAM + YOLO-NAS + Nav2 | **Onboard 7B-14B VLA Model Execution** |
+
 In the next chapter, we dive into simulation and data generation: **Isaac Sim for Humanoids and Synthetic Data Generation (SDG)**.
