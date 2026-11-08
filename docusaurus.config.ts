@@ -289,6 +289,10 @@ const config: Config = {
               label: 'Module 4: Vision-Language-Action (VLA)',
               to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
             },
+            {
+              label: 'Module 5: Humanoid Kinematics & Dynamics',
+              to: '/ai-book/module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics',
+            },
           ],
         },
         {
@@ -328,6 +332,10 @@ const config: Config = {
             {
               label: 'Module 4: VLA Systems',
               to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
+            },
+            {
+              label: 'Module 5: Kinematics & Dynamics',
+              to: '/ai-book/module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics',
             },
           ],
         },
