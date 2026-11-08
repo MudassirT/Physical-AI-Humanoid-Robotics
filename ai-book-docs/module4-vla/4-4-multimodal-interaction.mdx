@@ -181,6 +181,20 @@ Human-to-robot handover is the ultimate benchmark of multimodal fluidity. It req
 
 ---
 
+## 6. FoundationPose: Zero-Shot 6D Object Pose Estimation
+
+For precision humanoid grasping, 2D bounding boxes are insufficient. The robot must predict the full spatial pose `T in SE(3)` (3D translation `p in R^3` and 3D rotation `R in SO(3)`).
+
+**FoundationPose** (Wen et al., NVIDIA, 2024) achieves state-of-the-art zero-shot 6D object pose tracking without per-object CAD model training:
+1. **Pose Initialization**: Uses a Large Reconstruction Model (LRM) to estimate initial 6D pose from a single RGB-D image and 2D segmentation mask.
+2. **Pose Refinement**: Iteratively minimizes the chamfer distance between the measured depth point cloud and the rendered object hypothesis:
+   ```text
+   L_{chamfer}(T) = sum_{p in P_{depth}} min_{q in T * Q_{mesh}} ||p - q||^2 + sum_{q in T * Q_{mesh}} min_{p in P_{depth}} ||q - p||^2
+   ```
+3. **Real-Time Tracking**: Runs at **60 Hz on Jetson AGX Orin**, providing low-latency visual servoing feedback to the arm controller.
+
+---
+
 ## Summary
 
 Multimodal interaction is the bridge that transforms a humanoid from an isolated machine into an intuitive collaborator. By unifying **3D pointing ray geometry**, **zero-shot 6-DoF FoundationPose tracking**, and **stateful conversational disambiguation**, humanoid robots can comprehend natural, ambiguous human commands with industrial-grade precision.
