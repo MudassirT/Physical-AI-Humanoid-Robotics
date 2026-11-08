@@ -244,6 +244,24 @@ flowchart TD
 
 ---
 
+## 7. Acoustic Beamforming & End-to-End Latency Budgets
+
+In noisy industrial environments where humanoid actuators and fans generate 65+ dBA of mechanical acoustic noise, standard microphone inputs produce garbled transcripts. Frontier systems utilize a **circular 6-to-8 MEMS microphone array** embedded in the head crown with Delay-and-Sum Beamforming:
+
+```text
+y(t) = (1 / M) * sum_{m=1}^M ( x_m( t - tau_m(theta_look) ) )
+```
+
+| Pipeline Segment | Processing Modality | Typical Latency | Real-Time Constraint |
+| :--- | :--- | :--- | :--- |
+| **Acoustic Front-End** | Beamforming + AEC (Echo Cancellation) | 12 ms | Hardware DSP |
+| **Streaming VAD** | Silero VAD (32 ms sliding window) | 4 ms | Edge CPU |
+| **Streaming ASR** | NVIDIA Riva Conformer-CTC (TensorRT) | 85 ms | GPU Tensor Cores |
+| **Semantic Extraction** | Pydantic Grammar-Constrained Model | 120 ms | Local LLM Engine |
+| **Total Voice-to-Command Latency** | Full Audio Ingestion to Action Server | **221 ms** | **Sub-perceptual conversational UX** |
+
+---
+
 ## Summary
 
 The Voice-to-Action pipeline transforms acoustic vibrations into physical kinetic energy. By pairing hardware beamforming and echo cancellation with low-latency streaming ASR (NVIDIA Riva or Whisper-VAD), grammar-constrained Pydantic intent parsing, and robust ROS 2 Action interfaces, robotics engineers can build conversational humanoids capable of safe, deterministic execution.
