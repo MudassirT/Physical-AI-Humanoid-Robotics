@@ -165,7 +165,33 @@ int main(int argc, char * argv[]) {
 
 ---
 
-## 4. Module 1 Summary & Engineering Checklist
+## 4. SROS2 Security Architecture: PKI & Access Control
+
+Deploying high-torque humanoid robots in human-centric spaces requires cryptographic security against rogue packet injection:
+
+```mermaid
+graph TD
+    CA["Robotic Root Certificate Authority (CA)"]
+    
+    subgraph SROS2Enclave["SROS2 Security Enclave (DDS-Security v1.1)"]
+        Auth["1. Authentication (X.509 PKI Certificates)"]
+        Access["2. Access Control (Signed XML Governance & Permissions)"]
+        Crypto["3. Cryptographic Encryption (AES-GCM-256 Wire Encryption)"]
+    end
+
+    CA --> Auth
+    Auth --> Access
+    Access --> Crypto
+    Crypto --> SafeBus["Protected DDS Control Bus"]
+```
+
+1. **Authentication**: Every ROS 2 node must present an X.509 certificate signed by the robot root authority before participating in the RTPS discovery graph.
+2. **Access Control**: Fine-grained permissions restrict which nodes can publish to `/cmd_vel` or invoke `/safety/estop`.
+3. **Payload Encryption**: Hard real-time sensor streams use hardware-accelerated AES-GCM-256 encryption on Jetson ARM Cryptography Extensions.
+
+---
+
+## 5. Module 1 Summary & Engineering Checklist
 
 You have now established the complete, deterministic nervous system for an autonomous humanoid robot:
 - [x] **Decentralized DDS RTPS** configured without single points of failure.
