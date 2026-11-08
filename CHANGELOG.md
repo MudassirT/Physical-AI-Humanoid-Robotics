@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.3.0] - 2026-11-08
+
+### Added
+- **Module 5: Humanoid Kinematics & Dynamics**: 10 comprehensive chapters covering mathematical geometry and multi-body dynamics:
+  - *5-1: Introduction to Humanoid Kinematics & Coordinate Geometry* (SE(3), SO(3), Quaternions, SLERP, DH Parameters)
+  - *5-2: Forward Kinematics, Screw Theory & Lie Group SE(3)* (Twists, Rodrigues' formula, Product of Exponentials, Geometric Jacobians)
+  - *5-3: Inverse Kinematics, Redundancy Resolution & Optimization* (DLS, Levenberg-Marquardt, Null-Space Projection, QP Whole-Body IK)
+  - *5-4: Rigid Body Dynamics & Featherstone's Articulated Body Algorithm* (RNEA O(n) inverse dynamics, CRBA O(n^2), ABA O(n) forward dynamics)
+  - *5-5: Spatial Vector Algebra & Plücker Coordinates* (Motion space M^6 vs Force space F^6 duality, 6x6 spatial inertia, Plücker transforms)
+  - *5-6: Floating-Base Dynamics, Centroidal Momentum & Anthropometry* (6-DOF unactuated base, Winter's mass distribution, CMM matrix)
+  - *5-7: Trajectory Generation, Minimum-Jerk Profiles & Splines* (C^2 quintic splines, Flash-Hogan minimum-jerk, bipedal swing leg)
+  - *5-8: Differential Kinematics, Manipulability & Singularities* (SVD decomposition, Yoshikawa manipulability, condition number)
+  - *5-9: Contact Mechanics, Friction Cones & Ground Reaction Forces* (Unilateral constraints, Coulomb friction cones, CoP bounds)
+  - *5-10: Computational Dynamics Engines, Pinocchio & Drake Benchmarking* (Pinocchio v3, Drake, 1 kHz latency profiling on Jetson Orin)
+- **Master Plan for Curriculum Expansion**: 12-module roadmap blueprint (`specs/010-master-plan-curriculum-expansion/spec.md`) scaling curriculum to 100+ chapters.
+- **Deep Chapter Enhancements in Modules 1–4**:
+  - *Module 1*: Added OROCOS/YARP middleware comparison, RTPS wire protocol discovery (PDP/EDP), multi-threaded executor patterns, Eclipse Iceoryx zero-copy shared memory, and SROS2 PKI security.
+  - *Module 2*: Added ISO 23247 digital twin maturity models, LCP constraint solvers in DART, Allan variance stochastic IMU noise models, Unity HDRP coordinate transforms, and laboratory evaluation rubrics.
+  - *Module 3*: Added Jetson Thor / Orin hardware comparison, PhysX 5 reduced coordinate articulators, NITROS zero-copy GPU memory exchange, and 3D elevation lattice planning.
+  - *Module 4*: Added OpenVLA / π0 / Octo / GR00T foundation architecture matrix, microphone array acoustic beamforming, SayCan mathematical scoring, and FoundationPose 6D tracking.
+
+---
+
 ## [2.2.0] - 2026-11-07
 
 ### Added
@@ -59,3 +82,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project architecture and Docusaurus v3 setup.
 - Basic FastAPI backend skeleton with vector retriever services.
 - Initial ROS 2 middleware chapters and core concepts documentation.
+
