@@ -210,4 +210,17 @@ int main(int argc, char * argv[]) {
 }
 ```
 
+---
+
+## 4. Executor Threading Models & Deterministic Scheduling
+
+Selecting the appropriate executor architecture is critical for real-time humanoid performance:
+
+| Executor Type | Thread Count | Heap Allocations | Best For | Risk on Humanoids |
+| :--- | :--- | :--- | :--- | :--- |
+| **`SingleThreadedExecutor`** | 1 | Re-evaluates ready entities on every cycle | Simple non-RT nodes | Prone to thread starvation if one callback blocks |
+| **`MultiThreadedExecutor`** | N | Dynamic mutex locking per callback group | Vision / Perception nodes | Thread priority inversion and non-deterministic timing jitter |
+| **`StaticSingleThreadedExecutor`** | 1 | **Zero dynamic heap allocation after add_node** | **Hard real-time 1 kHz joint control** | Unsuitable for compute-bound parallel workloads |
+| **`EventsExecutor` (Modern ROS 2)** | 1 | Event-driven via wait-set wakeups | Battery-efficient edge processing | Slightly higher setup complexity |
+
 In the next chapter, we dive into continuous data transmission: **Topics, Quality of Service (QoS) Profiles, and Zero-Copy Shared Memory IPC**.
