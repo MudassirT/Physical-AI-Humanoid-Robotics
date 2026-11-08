@@ -96,4 +96,44 @@ Why do organizations like Tesla, Boston Dynamics, Figure, and Unitree invest ten
 - **Hardware-in-the-Loop (HIL)**: The exact C++ control code running on the physical humanoid PC runs against Gazebo with zero code modifications simply by switching `use_sim_time: true`.
 - **Parallel Scaling**: While a physical humanoid team might only have access to 2 physical prototypes, a digital twin can be instantiated 10,000 times in parallel on GPU clusters to evaluate gait stability across millions of parameter variations.
 
+---
+
+## 4. ISO 23247 Architecture & Real-Time Synchronization Budgets
+
+The international standard **ISO 23247 (Digital Twin Framework for Manufacturing)** defines four functional entities that govern humanoid digital twins:
+
+```mermaid
+flowchart TD
+    subgraph ObservablePhysicalSpace["Physical Humanoid Space"]
+        Sensors["Physical Sensors (IMU, F/T, Joint Encoders)"]
+        Actuators["Physical BLDC Actuators"]
+    end
+
+    subgraph DataCollection["Data Collection & Device Control"]
+        DDSBridge["RTPS Telemetry Ingestion (1 kHz)"]
+    end
+
+    subgraph DigitalTwinCore["Digital Twin Core (ISO 23247 Layer)"]
+        PhysicsSim["Physics Engine (DART / Gazebo Harmonic)"]
+        OpticalSim["Optical Engine (Unity HDRP)"]
+        KalmanShadow["Digital Shadow State Estimator"]
+    end
+
+    subgraph UserEntities["Operational Applications"]
+        RLTraining["RL Policy Training"]
+        HealthMonitoring["Fleet Health & Predictive Maintenance"]
+    end
+
+    Sensors --> DDSBridge
+    DDSBridge --> KalmanShadow
+    KalmanShadow --> PhysicsSim
+    KalmanShadow --> OpticalSim
+    PhysicsSim --> RLTraining
+    PhysicsSim --> HealthMonitoring
+    RLTraining --> Actuators
+```
+
+To maintain synchronization without phase lag, the telemetry pipeline latency budget must satisfy:
+`Latency_total = T_sample (1.0 ms) + T_network (0.2 ms) + T_state_fusion (0.3 ms) <= 2.0 ms`.
+
 In the next chapter, we master the computational foundation of the physics twin: **Gazebo Harmonic and Numerical Physics Solvers**.
