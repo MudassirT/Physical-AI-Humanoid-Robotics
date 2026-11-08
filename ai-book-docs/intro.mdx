@@ -107,10 +107,17 @@ This textbook is structured as a continuous engineering progression that builds 
 - **3D Locomotion & Navigation**: Nav2 for bipedal systems, 3D Elevation Mapping, Capture Point (CP) formulation, and dynamic footstep lattices.
 
 ### [Module 4: Vision-Language-Action (VLA) & Cognitive AI](./module4-vla/4-1-introduction-to-vla-systems)
-- **Embodied Foundation Models**: Architecture and training of RT-1, RT-2, OpenVLA, Octo, and $\pi_0$ (Physical Intelligence).
+- **Embodied Foundation Models**: Architecture and training of RT-1, RT-2, OpenVLA, Octo, and π0 (Physical Intelligence).
 - **Action Tokenization & Continuous Diffusion**: Discretized token bins vs. continuous score-based diffusion policies and Flow Matching.
 - **Voice-to-Action Execution**: Streaming ASR (Whisper), semantic intent extraction, and hierarchical task decomposition with LLMs.
 - **Affordance & Multimodal Grounding**: 3D bounding, 6-DOF FoundationPose, tactile feedback loops, and closed-loop error recovery.
+
+### [Module 5: Humanoid Kinematics & Dynamics](./module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics)
+- **Coordinate Geometry on SE(3)**: Quaternions, SLERP geodesic interpolation, and Product of Exponentials (PoE).
+- **Differential Kinematics & SVD**: Space Jacobians, Yoshikawa manipulability ellipsoids, and singularity avoidance.
+- **Recursive Multi-Body Dynamics**: Linear-time RNEA inverse dynamics, CRBA mass matrices, and Featherstone's O(n) Articulated Body Algorithm (ABA).
+- **Floating Base & Centroidal Momentum**: Underactuated 6-DOF base equations, Centroidal Momentum Matrix (CMM), and anthropometric mass modeling.
+- **Contact Mechanics & Ground Feasibility**: Coulomb friction cones, polyhedral pyramid approximations, and foot Center of Pressure (CoP) margins.
 
 ---
 
@@ -129,6 +136,6 @@ Throughout this textbook, every algorithmic and mathematical formulation directl
    - Miki, T., et al. (2022). *Learning robust perceptive locomotion for quadrupedal robots in the wild*. Science Robotics.
 4. **Vision-Language-Action & Foundation Policies**:
    - Brohan, A., et al. (Google DeepMind, 2023). *RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control*. arXiv:2307.15818.
-   - Black, K., et al. (Physical Intelligence, 2024). *$\pi_0$: A Vision-Language-Action Flow Model for Generalist Robot Manipulation*. Physical Intelligence Tech Report.
+   - Black, K., et al. (Physical Intelligence, 2024). *π0: A Vision-Language-Action Flow Model for Generalist Robot Manipulation*. Physical Intelligence Tech Report.
 
 Let us begin by building the robust, low-latency foundation required for physical embodiment: **The Robotic Nervous System**.
