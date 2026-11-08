@@ -102,4 +102,43 @@ graph TD
 
 Because annotations are rendered directly by the GPU graphics pipeline, thousands of training images with pixel-perfect labels can be generated every minute to train perception models without manual human labeling.
 
+---
+
+## 4. Coordinate Transformation Matrices: ROS 2 to Unity
+
+One of the most persistent sources of bugs in optical digital twins is the mismatch between the **Right-Handed Z-Up (ISO standard)** coordinate system used in ROS 2 / robotics and the **Left-Handed Y-Up** coordinate system used in Unity:
+
+```mermaid
+graph LR
+    subgraph ROSFrame["ROS 2 Standard (Right-Handed Z-Up)"]
+        Rx["+X: Forward"]
+        Ry["+Y: Left"]
+        Rz["+Z: Up"]
+    end
+
+    subgraph UnityFrame["Unity Standard (Left-Handed Y-Up)"]
+        Ux["+X: Right"]
+        Uy["+Y: Up"]
+        Uz["+Z: Forward"]
+    end
+
+    ROSFrame -->|Coordinate Transform Matrix T_U_R| UnityFrame
+```
+
+The transformation matrix `T_{Unity \leftarrow ROS}` for positions is:
+
+```text
+p_Unity = [  0   -1    0 ] [ p_x_ROS ]
+          [  0    0    1 ] [ p_y_ROS ]
+          [  1    0    0 ] [ p_z_ROS ]
+```
+
+And for quaternions `q = [w, x, y, z]`:
+
+```text
+q_Unity = [ q_w_ROS,  -q_y_ROS,  q_z_ROS,  q_x_ROS ]
+```
+
+Correctly applying this transformation at the C# WebSocket ingress layer guarantees that footstep targets and camera poses match physical reality down to micro-radians.
+
 In the next chapter, we synthesize these tools into a comprehensive hands-on lab: **Building and Simulating a Complete Bipedal Humanoid Model**.
