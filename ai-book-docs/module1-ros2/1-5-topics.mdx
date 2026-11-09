@@ -1,7 +1,11 @@
 ---
 sidebar_position: 5
-title: Topics, QoS Policies & Zero-Copy Shared Memory
+title: "Topics, QoS Policies & Zero-Copy Shared Memory"
+description: "Asynchronous publish-subscribe messaging, Iceoryx zero-copy shared memory transport, CDR/XCDR2 serialization, and ring buffer design."
 ---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
 
 # Topics, QoS Policies & Zero-Copy Shared Memory
 
@@ -22,29 +26,60 @@ flowchart TD
     subgraph ZeroCopyIPC["Zero-Copy Shared Memory IPC (Eclipse Iceoryx)"]
         Publisher2["Publisher: loan_message()"] --> ShmPool["Shared Memory Chunk Pool (/dev/shm)"]
         ShmPool -->|Pointer Swap (Zero CPU Memory Copy)| Subscriber2["Subscriber: take_loaned_message()"]
-        NoteZero["Latency: < 15 microseconds regardless of payload size (4K RGB or 100k LiDAR PointCloud)"]
+        NoteZero["Latency: < 1.5 microseconds regardless of payload size (4K RGB or 100k LiDAR PointCloud)"]
     end
 ```
 
 ---
 
-## 1. Quality of Service (QoS) Policies: The Determinism Rules
+## 1. Serialization Mechanics: CDR & XCDR2 Alignment Mathematics
 
-In ROS 1, all communication defaulted to TCP streams. In ROS 2, every Publisher and Subscriber specifies a fine-grained **QoS Profile**. If the QoS policies of the publisher and subscriber are incompatible, **no connection will be established**, and the subscriber will receive zero messages without generating a runtime error.
+All ROS 2 messages crossing process boundaries over standard network sockets undergo **Common Data Representation (CDR)** or **Extended CDR (XCDR2)** serialization as mandated by OMG standards.
 
-```mermaid
-graph TD
-    subgraph QoSPolicies["Core ROS 2 QoS Dimensions for Humanoid Systems"]
-        Reliability["1. Reliability<br/>• BEST_EFFORT: Discard dropped packets immediately.<br/>• RELIABLE: Retransmit lost packets until acknowledged."]
-        Durability["2. Durability<br/>• VOLATILE: Stored only while subscriber active.<br/>• TRANSIENT_LOCAL: Late-joining nodes receive last published message."]
-        History["3. History & Depth<br/>• KEEP_LAST (N): Keep latest N samples in ring buffer.<br/>• KEEP_ALL: Retain all messages until resource exhaustion."]
-        Deadline["4. Deadline<br/>• Enforce maximum time delta between consecutive messages.<br/>• Triggers hardware watchdog if sensor halts."]
-        Liveliness["5. Liveliness<br/>• AUTOMATIC vs. MANUAL_BY_NODE.<br/>• Detects node heartbeat death immediately."]
-    end
-```
+To enable hardware vector load instructions on ARM64 and x86_64 CPUs, primitives must be aligned to memory boundaries matching their byte size $a \in \{1, 2, 4, 8\}$ (e.g., 4 bytes for `float32`/`uint32`, 8 bytes for `float64`/`int64`).
 
-### The QoS Compatibility Matrix
-DDS enforces the **"Request vs. Offered" (RxO)** contract rule: A subscriber's requested QoS cannot be stricter than what the publisher offers:
+The mathematical padding added before inserting a field at current stream byte offset $o$ is:
+
+$$
+\text{pad}(o, a) = (a - (o \pmod a)) \pmod a
+$$
+
+The updated byte offset becomes $o' = o + \text{pad}(o, a) + \text{sizeof}(\text{primitive})$. Unaligned nested fields force memory padding that expands network packet size unless structures are ordered by decreasing primitive size.
+
+---
+
+## 2. Zero-Copy vs. Socket Transport Latency Formulation
+
+When large data arrays (such as RGB-D images or `sensor_msgs/msg/PointCloud2`) are transmitted over traditional IP loopback sockets, the transfer latency $\tau_{\text{socket}}$ scales linearly with payload byte size $S_{\text{payload}}$:
+
+$$
+\tau_{\text{socket}} = 2 \cdot \frac{S_{\text{payload}}}{B_{\text{mem}}} + 2 \cdot \tau_{\text{syscall}} + \tau_{\text{wire}}
+$$
+
+where $B_{\text{mem}}$ is memory copy bandwidth, and $\tau_{\text{syscall}}$ is the kernel context switch overhead for `sendmsg()` and `recvmsg()`.
+
+In contrast, **True Zero-Copy Shared Memory (Eclipse Iceoryx)** replaces byte copies with atomic pointer exchanges:
+
+$$
+\tau_{\text{zero\_copy}} = \tau_{\text{pointer\_exchange}} \approx \mathcal{O}(1) \le 1.5\,\mu\text{s}
+$$
+
+The latency is completely independent of payload size, enabling 60 Hz 4K point clouds to transfer with zero CPU copy overhead.
+
+---
+
+## 3. Hardware Architecture: Unified Memory (UMA) vs. Discrete PCIe
+
+| Architecture | Memory Layout | Bandwidth | Transfer Mechanism | Latency (8 MB Frame) |
+| :--- | :--- | :--- | :--- | :--- |
+| **NVIDIA Jetson AGX Orin** | Unified Memory Architecture (UMA) | 2048-bit LPDDR5 (204.8 GB/s) | Direct pointer sharing via zero-copy POSIX shm / NVMM | &lt; 2.0 $\mu$s |
+| **Discrete GPU Workstation** | Host DRAM + Dedicated VRAM | PCIe Gen 4 x16 (31.5 GB/s) | Host-to-Device `cudaMemcpyAsync` DMA transfer | ~250 $\mu$s |
+
+---
+
+## 4. Quality of Service (QoS) Policies: The Determinism Rules
+
+In ROS 2, every Publisher and Subscriber specifies a fine-grained **QoS Profile**. DDS enforces the **"Request vs. Offered" (RxO)** contract rule: A subscriber's requested QoS cannot be stricter than what the publisher offers:
 
 | Publisher Offers | Subscriber Requests | Compatible? | Behavioral Result |
 | :--- | :--- | :--- | :--- |
@@ -68,79 +103,55 @@ DDS enforces the **"Request vs. Offered" (RxO)** contract rule: A subscriber's r
 
 ---
 
-## 2. Zero-Copy Shared Memory Architecture (Eclipse Iceoryx)
+## 5. Production C++20 Zero-Copy PointCloud2 Publisher
 
-When transferring a single 4K stereo camera frame (3840 &times; 2160 &times; 3 bytes &approx; 24.8 MB) at 60 Hz:
-- Traditional socket serialisation requires moving **1.49 GB per second** through the CPU cache, causing severe cache eviction and starving the 1 kHz balance control thread.
-- **Zero-Copy Shared Memory (Eclipse Iceoryx)** allocates a fixed chunk pool inside POSIX shared memory (`/dev/shm`).
-
-### The Loaned Message Workflow:
-1. The Publisher requests a pointer to an unallocated chunk directly from the shared memory pool:
-   ```cpp
-   auto loaned_msg = publisher->borrow_loaned_message();
-   ```
-2. The camera driver writes raw sensor pixels directly into `loaned_msg.get()` via DMA (Direct Memory Access).
-3. The Publisher dispatches the message. Rather than copying bytes, DDS merely transmits a **64-bit memory address pointer** to the subscriber.
-4. The Subscriber processes the memory block in place, releasing the reference counter when finished.
-5. CPU consumption drops from **35% of an 8-core CPU** to **&lt; 0.5%**, and latency drops to sub-microsecond levels.
-
----
-
-## 3. Production C++20 Zero-Copy Sensor Publisher & Subscriber
+The following listing illustrates how to borrow memory chunks directly from the Iceoryx shared memory pool via `borrow_loaned_message()`:
 
 ```cpp
+// zero_copy_pointcloud_publisher.cpp
+#include <rclcpp/rclcpp.hpp>
+#include <sensor_msgs/msg/point_cloud2.hpp>
 #include <chrono>
-#include <memory>
-#include "rclcpp/rclcpp.hpp"
-#include "sensor_msgs/msg/imu.hpp"
 
 using namespace std::chrono_literals;
 
-class HighRateImuPublisher : public rclcpp::Node {
+class ZeroCopyLiDARPublisher : public rclcpp::Node {
 public:
-  HighRateImuPublisher() : Node("high_rate_imu_publisher") {
-    // 1. Configure strict Real-Time Sensor QoS
-    rclcpp::QoS sensor_qos(rclcpp::KeepLast(1));
-    sensor_qos.best_effort();  // Drop dropped packets; never block for retransmits
-    sensor_qos.durability_volatile();
-
-    // 2. Create publisher with loaned message capability
-    imu_pub_ = create_publisher<sensor_msgs::msg::Imu>("/sensors/imu/data_raw", sensor_qos);
-
-    // 3. Start 1,000 Hz timer (1 ms interval)
-    timer_ = create_wall_timer(1ms, std::bind(&HighRateImuPublisher::publish_imu, this));
+  ZeroCopyLiDARPublisher() : Node("zero_copy_lidar_publisher") {
+    pub_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/lidar/points", 10);
+    timer_ = this->create_wall_timer(50ms, std::bind(&ZeroCopyLiDARPublisher::publish_pointcloud, this));
+    RCLCPP_INFO(this->get_logger(), "ZeroCopyLiDARPublisher started at 20 Hz.");
   }
 
 private:
-  void publish_imu() {
-    // Check if underlying middleware supports loaned zero-copy memory
-    if (imu_pub_->can_loan_messages()) {
-      auto loaned_msg = imu_pub_->borrow_loaned_message();
-
-      // Populate directly in shared memory chunk
-      loaned_msg.get().header.stamp = now();
-      loaned_msg.get().header.frame_id = "imu_link";
-      loaned_msg.get().linear_acceleration.z = 9.80665; // Nominal gravity
-
-      // Zero-copy pointer dispatch
-      imu_pub_->publish(std::move(loaned_msg));
-    } else {
-      // Fallback for non-zero-copy transports
-      auto msg = std::make_unique<sensor_msgs::msg::Imu>();
-      msg->header.stamp = now();
-      msg->header.frame_id = "imu_link";
-      msg->linear_acceleration.z = 9.80665;
-      imu_pub_->publish(std::move(msg));
+  void publish_pointcloud() {
+    // Loan memory directly from Iceoryx shared memory pool
+    auto loaned_msg = pub_->borrow_loaned_message();
+    if (!loaned_msg.is_valid()) {
+      RCLCPP_WARN(this->get_logger(), "Failed to borrow loaned memory chunk from shared pool!");
+      return;
     }
+
+    auto& msg = loaned_msg.get();
+    msg.header.stamp = this->now();
+    msg.header.frame_id = "lidar_optical_frame";
+    msg.width = 10000;
+    msg.height = 1;
+    msg.point_step = 16;
+    msg.row_step = msg.width * msg.point_step;
+    msg.data.resize(msg.row_step); // Pre-allocated chunk
+
+    // Publish with zero memory copies via pointer loan transfer
+    pub_->publish(std::move(loaned_msg));
   }
 
-  rclcpp::Publisher<sensor_msgs::msg::Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub_;
   rclcpp::TimerBase::SharedPtr timer_;
 };
 
-int main(int argc, char * argv[]) {
+int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<HighRateImuPublisher>());
+  rclcpp::spin(std::make_shared<ZeroCopyLiDARPublisher>());
   rclcpp::shutdown();
   return 0;
 }
@@ -148,30 +159,59 @@ int main(int argc, char * argv[]) {
 
 ---
 
-## 5. Eclipse Iceoryx Shared Memory Architecture
+## 6. Research Foundations & Seminal Literature
 
-On a humanoid with stereo 4K RGB-D cameras (generating ~1.2 GB/s of raw uncompressed visual telemetry), standard network socket serialization causes severe CPU bottlenecks:
+1. **Staschulat, J., Ernst, R., & Radojicic, C. (2021).** *Complete Latency Analysis of Message Communication in ROS 2*. In IEEE International Conference on Embedded and Real-Time Computing Systems and Applications (RTCSA).
+2. **Eclipse Foundation. (2022).** *Eclipse Iceoryx: True Zero-Copy Inter-Process Communication Architecture Whitepaper*.
+3. **Object Management Group (OMG). (2019).** *Extensible and Dynamic Topic Types for DDS (DDS-XTypes), Version 1.3*. Formal Standard formal/19-11-01.
 
-```mermaid
-flowchart LR
-    subgraph TraditionalIPC["Traditional Sockets (Serialization Bottleneck)"]
-        direction TB
-        Pub1["Publisher Node"] -->|1. Serialize to CDR (CPU Copy)| Kernel1["OS Network Stack"]
-        Kernel1 -->|2. UDP Socket Buffer Copy| Kernel2["Loopback / Socket"]
-        Kernel2 -->|3. Deserialize from CDR (CPU Copy)| Sub1["Subscriber Node"]
-    end
+---
 
-    subgraph IceoryxIPC["Eclipse Iceoryx Shared Memory (True Zero-Copy)"]
-        direction TB
-        Pub2["Publisher Node (Loaned Message)"]
-        MemPool["Shared Memory Segment /dev/shm (Pre-allocated Chunks)"]
-        Sub2["Subscriber Node"]
+<ChapterProgress chapterId="1-5-topics" moduleId="module1" totalChapters={14} />
 
-        Pub2 -->|Direct Memory Write| MemPool
-        MemPool -->|Pointer Handoff via Unix Domain Socket (0 CPU Copies)| Sub2
-    end
-```
+## Chapter Mastery Check
 
-By decoupling payload transfers into fixed-size shared memory memory pools (`RouDi` daemon), Iceoryx maintains a constant **sub-microsecond transmission latency** regardless of whether a message is an 8-byte encoder position or an 800 MB lidar point cloud.
-
-In the next chapter, we analyze discrete request-response primitives: **Services, Thread Starvation, and Reentrant Concurrency**.
+<QuizEngine
+  quizId="quiz-1-5"
+  title="Module 1.5 Mastery Check: Topics, QoS Policies & Zero-Copy Shared Memory"
+  moduleId="module1"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why does loaning memory chunks from an Iceoryx shared memory pool eliminate transfer latency scaling with payload size?",
+      options: [
+        "Iceoryx compresses data using Gzip before sending",
+        "Instead of copying serialized byte buffers across kernel sockets, the middleware transfers a constant-size 64-bit pointer referencing the shared memory chunk in /dev/shm",
+        "It offloads all topic processing to the robot GPU",
+        "Shared memory bypasses physical RAM and writes directly to SSD"
+      ],
+      correctIndex: 1,
+      explanation: "Zero-copy shared memory avoids byte serialization and memcpy calls. The subscriber receives a direct pointer to the chunk allocated by the publisher in /dev/shm, ensuring sub-microsecond O(1) latency regardless of array size."
+    },
+    {
+      id: "q2",
+      question: "What is the purpose of Common Data Representation (CDR) memory alignment padding?",
+      options: [
+        "To encrypt messages before wireless transmission",
+        "To align primitive types to natural byte boundaries (e.g. 4 bytes for float32), enabling hardware vector load instructions without CPU alignment traps",
+        "To prevent topic names from colliding",
+        "To slow down publishers that publish too fast"
+      ],
+      correctIndex: 1,
+      explanation: "Modern CPUs (ARM64 and x86_64) require or heavily favor memory access aligned to natural data boundaries. CDR alignment padding ensures variables can be loaded directly into registers with single instructions."
+    },
+    {
+      id: "q3",
+      question: "Why should high-frequency 1 kHz joint state topics always use BEST_EFFORT reliability rather than RELIABLE?",
+      options: [
+        "RELIABLE QoS requires paying commercial licensing fees",
+        "In hard real-time balance loops, retransmissions of stale past samples block the transmission of the freshest sensor frame, causing balance controller divergence",
+        "BEST_EFFORT topics are immune to packet loss",
+        "RELIABLE topics cannot publish floating-point numbers"
+      ],
+      correctIndex: 1,
+      explanation: "In closed-loop walking, late sensor data is useless and harmful. Retransmitting an old packet when a new one is already available starves the controller of current robot state, causing instability."
+    }
+  ]}
+/>

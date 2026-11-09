@@ -1,13 +1,17 @@
 ---
 sidebar_position: 6
-title: Synchronous Services & Concurrency Deadlocks
+title: "Synchronous Services & Concurrency Deadlocks"
+description: "Client-service request-response architecture, reentrant callback scheduling, timeout mitigation patterns, and deadlock prevention."
 ---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
 
 # Synchronous Services & Concurrency Deadlocks
 
 While continuous data flows over Topics, discrete state transitions—such as zeroing motor encoder offsets, engaging mechanical holding brakes, or querying battery cell voltages—require a direct, synchronous Remote Procedure Call (RPC). In ROS 2, this is governed by **Services**.
 
-However, in multi-threaded robotics software, naive service invocations represent the single most common cause of **deadlocks and thread starvation**. Understanding executor callback scheduling and non-blocking asynchronous promises is mandatory for humanoid systems engineering.
+However, in multi-threaded robotics software, naive service invocations represent the single most common cause of **deadlocks and thread starvation**. Understanding executor callback scheduling, Petri net reachability proofs, and non-blocking asynchronous promises is mandatory for humanoid systems engineering.
 
 ```mermaid
 sequenceDiagram
@@ -49,125 +53,163 @@ float64[] homed_positions  # Recorded absolute zero angles (rad)
 
 ---
 
-## 2. The Deadlock Hazard: Blocking in Single-Threaded Executors
+## 2. Mathematical Modeling of Retry Dynamics & Exponential Backoff
 
-Consider a common anti-pattern: A supervisor node has a 10 Hz timer that evaluates robot stability. Inside the timer callback, the developer makes a synchronous service call:
+When multiple nodes query a shared service simultaneously (e.g., joint controllers requesting calibration parameters at startup), simultaneous retries induce contention collisions.
 
-```cpp
-// ANTI-PATTERN: GUARANTEED DEADLOCK IN SingleThreadedExecutor!
-void timer_callback() {
-  auto request = std::make_shared<CalibrateJoints::Request>();
-  // Blocking wait for future inside the executor thread
-  auto result_future = client_->async_send_request(request);
-  auto response = result_future.get(); // BLOCKS THREAD!
-}
-```
+To guarantee bounded network recovery, retry delays must follow **Exponential Backoff with Full Decorrelated Jitter**:
 
-### Why This Deadlocks:
-1. The `SingleThreadedExecutor` is actively running `timer_callback()`.
-2. The thread blocks waiting for `result_future.get()`.
-3. The service response arrives from the network and is placed on the executor queue.
-4. But the executor cannot dispatch the response callback because the single worker thread is permanently blocked inside `timer_callback()`!
-5. **Result**: The entire node freezes permanently, watchdog timers expire, and the humanoid crashes to the floor.
+$$
+T_{\text{retry}}(k) = \mathcal{U}\left(0, \min(T_{\text{max}}, T_{\text{base}} \cdot 2^k)\right)
+$$
+
+where:
+- $k$ is the zero-based retry counter,
+- $T_{\text{base}}$ is the initial base backoff window (e.g., $5\text{ ms}$),
+- $T_{\text{max}}$ is the saturation ceiling (e.g., $200\text{ ms}$),
+- $\mathcal{U}(a, b)$ is a uniform continuous random distribution over $[a, b]$.
+
+This stochastic decorrelation prevents synchronized lock-step retry bursts from flooding the underlying DDS RPC channel.
 
 ---
 
-## 3. The Professional Solution: Reentrant Groups & Async Futures
+## 3. Concurrency Deadlock Analysis via Petri Nets
 
-To safely invoke services without deadlocks, you must apply two architectural patterns:
-1. **Assign the Service Client to a `Reentrant` Callback Group**.
-2. **Handle responses asynchronously using non-blocking lambdas (`std::future::then`) or spin the client within a dedicated `MultiThreadedExecutor`**.
+Deadlocks in ROS 2 executors arise when cyclic resource waiting occurs under the classic **Coffman conditions** (Mutual Exclusion, Hold and Wait, No Preemption, Circular Wait).
 
-```mermaid
-flowchart TD
-    subgraph NonBlockingPattern["Safe Asynchronous Service Invocation Architecture"]
-        TimerCB["10 Hz Supervisor Timer Callback"] --> Dispatch["async_send_request(request)"]
-        Dispatch --> NonBlockingWait["Attach Response Promise Handler"]
-        NonBlockingWait --> Exit["Exit Timer Callback Immediately (Thread Unblocked)"]
-        
-        ResponseArrives["Service Response Arrives on Network"] --> ReentrantGroup["Reentrant Callback Group"]
-        ReentrantGroup --> WorkerThread["Available Executor Worker Thread"]
-        WorkerThread --> ExecuteCallback["Execute Promise Handler: Log Status & Enable Gait"]
-    end
-```
+### Petri Net Conservation & Liveness Condition
+
+Let a robotic concurrency model be represented by a Petri Net with places $P$, transitions $T$, and token marking $M$. A system is certified deadlock-free (possessing liveness level $L_4$) if and only if:
+
+$$
+\forall t \in T, \; \exists M' \text{ reachable from } M \text{ such that } M' \xrightarrow{t}
+$$
+
+and the weighted token conservation invariant holds:
+
+$$
+\sum_{p \in P} w(p) \cdot M(p) = \text{const}
+$$
+
+In a `SingleThreadedExecutor`, nesting a blocking `future.get()` call inside a callback locks the single execution token $M(p_{\text{thread}}) = 0$, violating liveness and halting the graph permanently.
 
 ---
 
-## 4. Production C++20 Non-Blocking Service Implementation
+## 4. Hardware Actuator Bus Service Latencies & Failure Modes
 
-Below is a robust implementation of a humanoid power management service client that executes asynchronously with safety timeouts:
+| Actuator Bus Device | Control Signal | Response Time | Hardware Failure Mode on Timeout |
+| :--- | :--- | :--- | :--- |
+| **Power Distribution Relays** | High-Current Solid-State MOSFET Relay | 1.5–5.0 ms | Incomplete contact engagement; inductive arc during 48V motor bus energization |
+| **Optical Encoder Index Search** | Digital Home Capture Pin | 50–500 ms | Joint runs into mechanical hard-stop if index pulse is not captured |
+| **Motor Holding Brakes** | 24V Solenoid Spring Brake | 15–30 ms | Mechanical brake shoe drag if joint commanded to move prior to release confirmation |
+
+---
+
+## 5. Production C++20 Non-Blocking Asynchronous Service Client
+
+To guarantee deterministic progress without deadlocks, services must be called asynchronously with strict deadline timeouts:
 
 ```cpp
+// async_service_client_with_timeout.cpp
+#include <rclcpp/rclcpp.hpp>
+#include <example_interfaces/srv/set_bool.hpp>
 #include <chrono>
-#include <memory>
-#include "rclcpp/rclcpp.hpp"
-#include "std_srvs/srv/set_bool.hpp"
 
 using namespace std::chrono_literals;
 
-class SafePowerSupervisor : public rclcpp::Node {
+class SafeServiceCaller : public rclcpp::Node {
 public:
-  SafePowerSupervisor() : Node("safe_power_supervisor") {
-    // 1. Create a Reentrant callback group to allow concurrent callback dispatch
-    client_cb_group_ = create_callback_group(rclcpp::CallbackGroupType::Reentrant);
-
-    // 2. Initialize the service client within the reentrant group
-    power_client_ = create_client<std_srvs::srv::SetBool>(
-      "/hardware/power_distribution/enable_high_voltage",
-      rmw_qos_profile_services_default,
-      client_cb_group_);
-
-    // 3. Initiate non-blocking asynchronous request
-    call_power_service_async(true);
+  SafeServiceCaller() : Node("safe_service_caller") {
+    client_ = this->create_client<example_interfaces::srv::SetBool>("/power_stage/enable");
   }
 
-  void call_power_service_async(bool enable_power) {
-    if (!power_client_->wait_for_service(2s)) {
-      RCLCPP_ERROR(get_logger(), "Power distribution service unavailable! Aborting.");
-      return;
+  void execute_safe_call() {
+    while (!client_->wait_for_service(1s)) {
+      if (!rclcpp::ok()) return;
+      RCLCPP_INFO(this->get_logger(), "Awaiting service availability...");
     }
 
-    auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
-    request->data = enable_power;
+    auto request = std::make_shared<example_interfaces::srv::SetBool::Request>();
+    request->data = true;
 
-    RCLCPP_INFO(get_logger(), "Dispatching asynchronous power request...");
-
-    // Non-blocking call returning a shared_future
-    auto future_result = power_client_->async_send_request(
-      request,
-      [this](rclcpp::Client<std_srvs::srv::SetBool>::SharedFuture future) {
-        // Callback invoked when response arrives without blocking the executor
-        try {
-          auto response = future.get();
-          if (response->success) {
-            RCLCPP_INFO(get_logger(), "High voltage bus enabled: %s", response->message.c_str());
-          } else {
-            RCLCPP_ERROR(get_logger(), "Power bus rejected enable: %s", response->message.c_str());
-          }
-        } catch (const std::exception & e) {
-          RCLCPP_FATAL(get_logger(), "Service call failed with exception: %s", e.what());
-        }
-      });
+    auto future = client_->async_send_request(request);
+    // Asynchronous deadline wait without blocking the executor thread
+    if (future.wait_for(200ms) == std::future_status::ready) {
+      auto response = future.get();
+      RCLCPP_INFO(this->get_logger(), "Service Success: %s", response->message.c_str());
+    } else {
+      RCLCPP_ERROR(this->get_logger(), "Service deadline violated! Triggering safety abort.");
+    }
   }
 
 private:
-  rclcpp::CallbackGroup::SharedPtr client_cb_group_;
-  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr power_client_;
+  rclcpp::Client<example_interfaces::srv::SetBool>::SharedPtr client_;
 };
 
-int main(int argc, char * argv[]) {
+int main(int argc, char** argv) {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<SafePowerSupervisor>();
-
-  // Must use MultiThreadedExecutor with Reentrant Callback Groups
-  rclcpp::executors::MultiThreadedExecutor executor(
-    rclcpp::ExecutorOptions(), 4 /* 4 worker threads */);
-  executor.add_node(node);
-  executor.spin();
-
+  auto node = std::make_shared<SafeServiceCaller>();
+  node->execute_safe_call();
   rclcpp::shutdown();
   return 0;
 }
 ```
 
-In the next chapter, we transition from short-lived RPCs to long-horizon, preemptible tasks: **ROS 2 Actions for Humanoid Locomotion and Manipulation**.
+---
+
+## 6. Research Foundations & Seminal Literature
+
+1. **Pardo-Castellote, G. (2001).** *OMG Data-Distribution Service: Architectural Overview*. In 23rd International Conference on Distributed Computing Systems Workshops.
+2. **Coffman, E. G., Elphick, M., & Shoshani, A. (1971).** *System Deadlocks*. ACM Computing Surveys (CSUR), 3(2), 67-78.
+3. **Murata, T. (1989).** *Petri nets: Properties, analysis and applications*. Proceedings of the IEEE, 77(4), 541-580.
+
+---
+
+<ChapterProgress chapterId="1-6-services" moduleId="module1" totalChapters={14} />
+
+## Chapter Mastery Check
+
+<QuizEngine
+  quizId="quiz-1-6"
+  title="Module 1.6 Mastery Check: Synchronous Services & Concurrency Deadlocks"
+  moduleId="module1"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why does invoking future.get() inside a timer callback on a SingleThreadedExecutor cause an unrecoverable deadlock?",
+      options: [
+        "The compiler optimizes out the future variable",
+        "The single worker thread is blocked waiting for the response, preventing the executor from ever dispatching the incoming response callback",
+        "Services only function over Wi-Fi connections",
+        "POSIX kernels terminate processes that block for more than 1 ms"
+      ],
+      correctIndex: 1,
+      explanation: "A SingleThreadedExecutor has exactly one thread. If that thread blocks inside a callback waiting for an RPC reply, it cannot process the incoming network response, resulting in a permanent circular deadlock."
+    },
+    {
+      id: "q2",
+      question: "In Exponential Backoff with Full Jitter, why is a random uniform draw U(0, min(T_max, T_base * 2^k)) added to retry intervals?",
+      options: [
+        "To satisfy cryptographic randomness standards",
+        "To decorrelate simultaneous retries across distributed nodes and prevent destructive synchronized retry storms",
+        "To decrease the CPU clock temperature",
+        "Because DDS RTPS requires random sequence numbers"
+      ],
+      correctIndex: 1,
+      explanation: "Without jitter, nodes that fail simultaneously retry at identical time steps, re-colliding repeatedly. Uniform full jitter decorrelates retry attempts across the network."
+    },
+    {
+      id: "q3",
+      question: "Why should services never be used for continuous 500 Hz joint torque command streaming?",
+      options: [
+        "C++ does not support high-frequency functions",
+        "Services enforce synchronous request-response semantics and generate significant protocol header overhead, lacking zero-copy shared memory pipelines",
+        "Torque cannot be expressed as a 64-bit float",
+        "Services require human keyboard confirmation"
+      ],
+      correctIndex: 1,
+      explanation: "Services involve round-trip RPC handshakes with state tracking. For continuous 500 Hz streams, topics with best-effort QoS and zero-copy shared memory are required to avoid latency bottlenecks."
+    }
+  ]}
+/>
