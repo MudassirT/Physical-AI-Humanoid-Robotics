@@ -1,13 +1,38 @@
+import fs from 'fs';
+import path from 'path';
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+
+function getModuleRoute(dirName: string, firstChapter: string, categorySlug: string): string {
+  const chapterPath = path.join(__dirname, 'ai-book-docs', dirName, `${firstChapter}.mdx`);
+  if (fs.existsSync(chapterPath)) {
+    return `/ai-book/${dirName}/${firstChapter}`;
+  }
+  const dirPath = path.join(__dirname, 'ai-book-docs', dirName);
+  if (fs.existsSync(dirPath) && fs.readdirSync(dirPath).some((f) => f.endsWith('.md') || f.endsWith('.mdx'))) {
+    return `/ai-book/${categorySlug}`;
+  }
+  return '/ai-book/intro';
+}
 
 const config: Config = {
   title: 'Physical AI & Humanoid Robotics | The Open Curriculum for Embodied AI',
   tagline: 'Master low-latency ROS 2 middleware, physics-accurate Digital Twins, NVIDIA Isaac perception, and Vision-Language-Action (VLA) foundation models for autonomous bipedal humanoids.',
   favicon: 'img/favicon.svg',
+
+  stylesheets: [
+    {
+      href: 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css',
+      type: 'text/css',
+      integrity: 'sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+',
+      crossorigin: 'anonymous',
+    },
+  ],
 
   // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
   future: {
@@ -127,6 +152,8 @@ const config: Config = {
         path: 'ai-book-docs',
         routeBasePath: 'ai-book',
         sidebarPath: require.resolve('./ai-book-docs/sidebar.ts'),
+        remarkPlugins: [remarkMath],
+        rehypePlugins: [rehypeKatex],
       },
     ],
     // Custom Webpack/Rspack plugin to expose REACT_APP_FASTAPI_BASE_URL to client-side
@@ -275,23 +302,51 @@ const config: Config = {
           items: [
             {
               label: 'Module 1: The Robotic Nervous System (ROS 2)',
-              to: '/ai-book/module1-ros2/1-1-introduction',
+              to: getModuleRoute('module1-ros2', '1-1-introduction', 'category/module-1-robotic-nervous-system'),
             },
             {
               label: 'Module 2: The Digital Twin (Gazebo & Unity)',
-              to: '/ai-book/module2-digital-twin/2-1-introduction-to-digital-twins',
+              to: getModuleRoute('module2-digital-twin', '2-1-introduction-to-digital-twins', 'category/module-2-digital-twin'),
             },
             {
               label: 'Module 3: The AI-Robot Brain (NVIDIA Isaac)',
-              to: '/ai-book/module3-ai-robot-brain/3-1-introduction-to-isaac-platform',
+              to: getModuleRoute('module3-ai-robot-brain', '3-1-introduction-to-isaac-platform', 'category/module-3-ai-robot-brain'),
             },
             {
-              label: 'Module 4: Vision-Language-Action (VLA)',
-              to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
+              label: 'Module 4: Vision-Language-Action (VLA) Systems',
+              to: getModuleRoute('module4-vla', '4-1-introduction-to-vla-systems', 'category/module-4-vla'),
             },
             {
               label: 'Module 5: Humanoid Kinematics & Dynamics',
-              to: '/ai-book/module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics',
+              to: getModuleRoute('module5-kinematics-dynamics', '5-1-introduction-to-robot-kinematics', 'category/module-5-kinematics-dynamics'),
+            },
+            {
+              label: 'Module 6: Bipedal Locomotion & Whole-Body Control',
+              to: getModuleRoute('module6-bipedal-locomotion', '6-1-introduction-to-bipedal-locomotion', 'category/module-6-bipedal-locomotion'),
+            },
+            {
+              label: 'Module 7: Dexterous Manipulation & Hand Design',
+              to: getModuleRoute('module7-dexterous-manipulation', '7-1-introduction-to-dexterous-manipulation', 'category/module-7-dexterous-manipulation'),
+            },
+            {
+              label: 'Module 8: Robot Learning & Reinforcement Learning',
+              to: getModuleRoute('module8-robot-learning', '8-1-foundations-of-reinforcement-learning', 'category/module-8-robot-learning'),
+            },
+            {
+              label: 'Module 9: Sim-to-Real Transfer & Domain Randomization',
+              to: getModuleRoute('module9-sim-to-real', '9-1-the-reality-gap', 'category/module-9-sim-to-real'),
+            },
+            {
+              label: 'Module 10: Hardware Architecture & Embedded Systems',
+              to: getModuleRoute('module10-hardware-architecture', '10-1-humanoid-mechanical-design', 'category/module-10-hardware-architecture'),
+            },
+            {
+              label: 'Module 11: Safety, Ethics & Deployment',
+              to: getModuleRoute('module11-safety-ethics', '11-1-robot-safety-standards', 'category/module-11-safety-ethics'),
+            },
+            {
+              label: 'Module 12: Capstone Projects & Research Frontiers',
+              to: getModuleRoute('module12-capstone-frontiers', '12-1-capstone-project-guide', 'category/module-12-capstone-frontiers'),
             },
           ],
         },
@@ -311,7 +366,7 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Curriculum Modules',
+          title: 'Curriculum (Modules 1–6)',
           items: [
             {
               label: 'Introduction & Foundations',
@@ -319,23 +374,56 @@ const config: Config = {
             },
             {
               label: 'Module 1: ROS 2 Nervous System',
-              to: '/ai-book/module1-ros2/1-1-introduction',
+              to: getModuleRoute('module1-ros2', '1-1-introduction', 'category/module-1-robotic-nervous-system'),
             },
             {
               label: 'Module 2: Digital Twin (Gazebo/Unity)',
-              to: '/ai-book/module2-digital-twin/2-1-introduction-to-digital-twins',
+              to: getModuleRoute('module2-digital-twin', '2-1-introduction-to-digital-twins', 'category/module-2-digital-twin'),
             },
             {
               label: 'Module 3: AI-Robot Brain (Isaac)',
-              to: '/ai-book/module3-ai-robot-brain/3-1-introduction-to-isaac-platform',
+              to: getModuleRoute('module3-ai-robot-brain', '3-1-introduction-to-isaac-platform', 'category/module-3-ai-robot-brain'),
             },
             {
               label: 'Module 4: VLA Systems',
-              to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
+              to: getModuleRoute('module4-vla', '4-1-introduction-to-vla-systems', 'category/module-4-vla'),
             },
             {
               label: 'Module 5: Kinematics & Dynamics',
-              to: '/ai-book/module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics',
+              to: getModuleRoute('module5-kinematics-dynamics', '5-1-introduction-to-robot-kinematics', 'category/module-5-kinematics-dynamics'),
+            },
+            {
+              label: 'Module 6: Bipedal Locomotion',
+              to: getModuleRoute('module6-bipedal-locomotion', '6-1-introduction-to-bipedal-locomotion', 'category/module-6-bipedal-locomotion'),
+            },
+          ],
+        },
+        {
+          title: 'Curriculum (Modules 7–12)',
+          items: [
+            {
+              label: 'Module 7: Dexterous Manipulation',
+              to: getModuleRoute('module7-dexterous-manipulation', '7-1-introduction-to-dexterous-manipulation', 'category/module-7-dexterous-manipulation'),
+            },
+            {
+              label: 'Module 8: Robot Learning & RL',
+              to: getModuleRoute('module8-robot-learning', '8-1-foundations-of-reinforcement-learning', 'category/module-8-robot-learning'),
+            },
+            {
+              label: 'Module 9: Sim-to-Real Transfer',
+              to: getModuleRoute('module9-sim-to-real', '9-1-the-reality-gap', 'category/module-9-sim-to-real'),
+            },
+            {
+              label: 'Module 10: Hardware & Embedded',
+              to: getModuleRoute('module10-hardware-architecture', '10-1-humanoid-mechanical-design', 'category/module-10-hardware-architecture'),
+            },
+            {
+              label: 'Module 11: Safety, Ethics & Deployment',
+              to: getModuleRoute('module11-safety-ethics', '11-1-robot-safety-standards', 'category/module-11-safety-ethics'),
+            },
+            {
+              label: 'Module 12: Capstones & Frontiers',
+              to: getModuleRoute('module12-capstone-frontiers', '12-1-capstone-project-guide', 'category/module-12-capstone-frontiers'),
             },
           ],
         },
