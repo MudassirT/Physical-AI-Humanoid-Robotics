@@ -4,27 +4,24 @@ title: "Hands-On Project: Complete Isaac Perception-to-Locomotion Loop"
 description: "End-to-end implementation of an autonomous humanoid navigation stack in NVIDIA Isaac Sim: integrating cuVSLAM visual odometry, 3D costmaps, Nav2 bipedal footstep planning, and Whole-Body Control."
 ---
 
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
+
 # Hands-On Project: Complete Isaac Perception-to-Locomotion Loop
 
-This capstone project synthesizes the core concepts of **Module 3: The AI Robot Brain**. You will engineer and execute an end-to-end autonomous humanoid autonomy stack inside **NVIDIA Isaac Sim 4.0** and **Isaac ROS 3.0**. 
+This comprehensive laboratory capstone consolidates the foundational theory across the first half of **Module 3: The AI-Robot Brain**. You will engineer, configure, and evaluate an autonomous humanoid navigation stack inside **NVIDIA Isaac Sim** and **Isaac ROS**.
 
-The system receives raw hardware-accelerated stereo camera and IMU feeds from a simulated humanoid (e.g., Unitree H1 or Figure 01 archetype), executes GPU-accelerated visual-inertial odometry via **cuVSLAM**, reconstructs a dense 3D Signed Distance Field (TSDF) via **nvblox**, plans collision-free bipedal footstep trajectories via **Nav2**, and tracks those footsteps using a **Quadratic Programming Whole-Body Controller (QP-WBC)**.
-
----
-
-## 1. System Architecture & Information Flow
-
-The architecture decouples high-frequency dynamic stability (1 kHz on CPU / RTOS) from heavy visual perception and global navigation (30–60 Hz on GPU):
+The system receives raw hardware-accelerated stereo camera and IMU feeds from a simulated humanoid (e.g., Unitree H1 or Figure 01 archetype), executes GPU-accelerated visual-inertial odometry via **cuVSLAM**, reconstructs a dense 3D Signed Distance Field (TSDF) via **nvblox**, plans collision-free bipedal footstep trajectories via **Nav2**, and tracks those footsteps using a **Hierarchical Quadratic Programming Whole-Body Controller (QP-WBC)**.
 
 ```mermaid
 flowchart TD
     subgraph IsaacSim ["NVIDIA Isaac Sim 4.0 (RTX Omniverse)"]
-        Sensors["Stereo Cameras (60 Hz) + IMU (1 kHz)"]
-        Physics["PhysX 5.4 GPU Rigid Body Pipeline"]
-        JointDrives["PD Actuator Controllers (1 kHz)"]
+        Sensors["Stereo Cameras (60 Hz) + Pelvis IMU (1 kHz)"]
+        Physics["PhysX 5.4 GPU Rigid Body Articulation"]
+        JointDrives["1 kHz Actuator Joint Drives"]
     end
 
-    subgraph GPUPerception ["Isaac ROS 3.0 (NITROS / CUDA)"]
+    subgraph GPUPerception ["Isaac ROS 3.0 (NITROS / CUDA Unified Memory)"]
         cuVSLAM["cuVSLAM Node<br/>(Stereo VIO Factor Graph)"]
         Nvblox["nvblox Node<br/>(GPU 3D TSDF Reconstruction)"]
         Costmap3D["3D Elevation Costmap Layer"]
@@ -33,10 +30,10 @@ flowchart TD
     subgraph NavStack ["Nav2 Autonomy Stack"]
         BTNav["Behavior Tree Navigator"]
         LatticePlanner["Bipedal Footstep Lattice Planner (ARA*)"]
-        FootstepPub["Footstep Sequence (/planned_footsteps)"]
+        FootstepPub["Footstep Trajectory (/planned_footsteps)"]
     end
 
-    subgraph ControlLoop ["Real-Time Whole-Body Control (1 kHz)"]
+    subgraph ControlLoop ["Real-Time Whole-Body Control (1 kHz RTOS Thread)"]
         LIPM["3D-LIPM Capture Point Generator"]
         QPSolver["QP-WBC Solver (OSQP / qpOASES)"]
         WrenchDist["Contact Wrench Distribution"]
@@ -60,104 +57,158 @@ flowchart TD
 
 ---
 
-## 2. Environment Setup & Prerequisites
+## 1. Mathematical Benchmarking: ATE and RPE Metrics
 
-### System Requirements
-- **Host GPU**: NVIDIA RTX 4080 / RTX A5000 or higher (16 GB+ VRAM required for concurrent PhysX + cuVSLAM + nvblox).
-- **Driver**: NVIDIA Linux display driver `&gt;= 535.129.03`.
-- **Containers**: Isaac Sim 4.0.0 Workstation container and Isaac ROS 3.0 Development Container.
-- **ROS 2**: Humble Hawksbill / Iron Irwini on Ubuntu 22.04 LTS.
+To evaluate visual-inertial odometry and state estimation accuracy against ground-truth optical motion capture (e.g., OptiTrack PrimeX), we formulate the standardized trajectory error metrics (Sturm et al., 2012).
 
-Verify CUDA acceleration and Isaac ROS NITROS dependencies inside your shell:
+Let $\mathbf{P}_{1:N} \in SE(3)$ denote the time-synchronized estimated trajectory poses and $\mathbf{Q}_{1:N} \in SE(3)$ denote the ground-truth poses.
 
-```bash
-# Verify NVIDIA Container Toolkit detects the GPU
-nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv
+### Absolute Trajectory Error (ATE)
 
-# Pull and launch the Isaac ROS Development container
-cd ~/workspaces/isaac_ros-dev/src
-git clone https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_visual_slam.git
-git clone https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_nvblox.git
-git clone https://github.com/NVIDIA-ISAAC-ROS/isaac_ros_common.git
+The Absolute Trajectory Error measures global trajectory consistency. Because estimated and ground-truth trajectories originate in independent coordinate frames, we compute the optimal rigid transformation $\mathbf{S} \in SE(3)$ using **Umeyama's method** (Umeyama, 1991):
 
-cd ~/workspaces/isaac_ros-dev
-./src/isaac_ros_common/scripts/run_dev.sh
-```
+$$
+\mathbf{S}^* = \arg\min_{\mathbf{S} \in SE(3)} \sum_{k=1}^{N} \left\| \text{trans}(\mathbf{Q}_k) - \mathbf{S} \cdot \text{trans}(\mathbf{P}_k) \right\|_2^2
+$$
+
+The individual pose error matrix at step $k$ is:
+
+$$
+\mathbf{E}_k = \mathbf{Q}_k^{-1} \mathbf{S}^* \mathbf{P}_k
+$$
+
+The scalar root-mean-square error metric ($\text{ATE}_{\text{RMSE}}$) is defined as:
+
+$$
+\text{ATE}_{\text{RMSE}} = \sqrt{\frac{1}{N} \sum_{k=1}^{N} \|\text{trans}(\mathbf{E}_k)\|_2^2}
+$$
+
+### Relative Pose Error (RPE)
+
+The Relative Pose Error measures local drift over a fixed temporal evaluation window $\Delta t$:
+
+$$
+\Delta \mathbf{E}_i = \left( \mathbf{Q}_i^{-1} \mathbf{Q}_{i+\Delta t} \right)^{-1} \left( \mathbf{P}_i^{-1} \mathbf{P}_{i+\Delta t} \right)
+$$
+
+The translational and rotational RPE metrics are given by:
+
+$$
+\text{RPE}_{\text{trans}} = \sqrt{\frac{1}{M} \sum_{i=1}^{M} \|\text{trans}(\Delta \mathbf{E}_i)\|_2^2}, \quad \text{RPE}_{\text{rot}} = \sqrt{\frac{1}{M} \sum_{i=1}^{M} \angle(\text{rot}(\Delta \mathbf{E}_i))^2}
+$$
+
+where $\angle(\mathbf{R}) = \arccos\left(\frac{\text{Trace}(\mathbf{R}) - 1}{2}\right)$.
 
 ---
 
-## 3. Exercise 1: Isaac ROS Composable Perception Pipeline
+## 2. Hardware Calibration Rig & Ground-Truth Infrastructure
 
-To achieve sub-5 millisecond latency between sensor exposure and pose estimation, launch cuVSLAM and nvblox inside a single **ComposableNodeContainer**. This eliminates inter-process memory copies by retaining sensor frames in Unified Memory (CUDA IPC).
+To ensure rigorous validation on real humanoid platforms, high-precision calibration and motion-tracking infrastructure must be established:
 
-Create `isaac_humanoid_perception.launch.py`:
+### 1. OptiTrack Motion Capture System
+- **Camera Array**: 12x OptiTrack PrimeX 13 cameras tracking retro-reflective marker clusters mounted to the humanoid pelvis and feet at 240 FPS with sub-millimeter ($< 0.2 \text{ mm}$) spatial accuracy.
+- **Clock Synchronization**: PTP (IEEE 1588v2) master clock synchronizing motion capture frames with the onboard Jetson AGX Orin system clock via hardware PPS.
+
+### 2. Spatiotemporal Multi-Sensor Calibration (Kalibr)
+- **Target Rig**: Precision ground-glass AprilTag calibration target ($6 \times 6$ grid, $0.05 \text{ m}$ spacing) mounted on a rigid optical breadboard.
+- **Optimization**: Joint maximum-likelihood continuous-time B-spline estimation (Furgale et al., 2013) solving for:
+  - Camera intrinsic matrices $\mathbf{K}_{\text{left}}, \mathbf{K}_{\text{right}}$ and radial-tangential distortion parameters $(k_1, k_2, p_1, p_2)$.
+  - Extrinsic spatial transform $\mathbf{T}_{\text{cam}}^{\text{imu}} \in SE(3)$.
+  - Temporal latency offset $t_{\text{shift}} = t_{\text{cam}} - t_{\text{imu}}$ (calibrated to $< 0.1 \text{ ms}$).
+
+---
+
+## 3. The 10 Graded Laboratory Exercises
+
+Students must complete the following 10 structured projects to master the Module 3 physical AI curriculum:
+
+| Project # | Project Title | Primary Objective | Deliverable & Acceptance Criteria |
+| :--- | :--- | :--- | :--- |
+| **Project 3.1** | *Jetson Hardware & Roofline Analysis* | Profile memory bandwidth and Tensor Core TFLOPS using `nvpmodel` and `tegrastats`. | Script reporting operational intensity $I$ and confirming mode MAXN 60W operation. |
+| **Project 3.2** | *PhysX 5 Humanoid Articulation Setup* | Import 28-DOF humanoid URDF into Isaac Sim with Reduced Coordinate Articulations. | Valid USD asset maintaining zero joint stretching under 1,000 Hz physics simulation. |
+| **Project 3.3** | *Omniverse Replicator SDG Pipeline* | Generate 5,000 domain-randomized synthetic frames with 3D bounding boxes. | Synthetic COCO dataset achieving $> 75\%$ mAP on fine-tuned detector. |
+| **Project 3.4** | *NITROS Zero-Copy Composable Node* | Implement a C++ ROS 2 node executing in-place CUDA processing via REP-2007. | Composable container demonstrating $< 3\%$ CPU load on 1080p60 stereo stream. |
+| **Project 3.5** | *cuVSLAM Parameter Tuning for Walking* | Calibrate IMU noise covariances to eliminate drift under heel-strike shock. | $\text{ATE}_{\text{RMSE}} \le 0.05 \text{ m}$ across a 20-meter bipedal walking trajectory. |
+| **Project 3.6** | *3D GridMap Elevation Layer Integration* | Build point cloud filtering node generating multi-layer slope and roughness maps. | Real-time 20 Hz elevation map publishing non-traversable slope boundaries. |
+| **Project 3.7** | *Capture Point Dynamic Step Replanner* | Implement ICP step-recovery logic responding to simulated lateral impulse pushes. | Simulated humanoid successfully arrests forward falls under $40 \text{ N}\cdot\text{s}$ impulses. |
+| **Project 3.8** | *Hierarchical QP Whole-Body Controller* | Formulate QP solving contact wrench distribution across dual support feet. | OSQP controller meeting $< 0.5 \text{ ms}$ solve time per 1 kHz control cycle. |
+| **Project 3.9** | *Nav2 Custom Footstep Action Plugin* | Author Nav2 Behavior Tree plugin executing discrete left/right footstep actions. | Autonomous navigation through an obstacle maze with zero foot-obstacle collisions. |
+| **Project 3.10** | *Full-Stack Autonomy Capstone* | Integrate perception, mapping, footstep planning, and WBC in a warehouse scenario. | Humanoid walks 15 meters, navigates terrain, and aligns with target pick table. |
+
+---
+
+## 4. End-to-End Pipeline Launch Configuration
+
+Create `isaac_humanoid_perception.launch.py` to deploy cuVSLAM and nvblox inside a shared ComposableNodeContainer:
 
 ```python
-import os
+"""
+isaac_humanoid_perception.launch.py
+Launches cuVSLAM and nvblox within a unified NITROS composable container
+for zero-copy GPU memory exchange on Jetson AGX Orin.
+"""
+
 from launch import LaunchDescription
 from launch_ros.actions import ComposableNodeContainer
 from launch_ros.descriptions import ComposableNode
 
+
 def generate_launch_description():
-    """
-    Spawns cuVSLAM and nvblox into a unified NITROS container
-    for zero-copy GPU memory exchange.
-    """
     perception_container = ComposableNodeContainer(
-        name='isaac_perception_container',
-        namespace='humanoid',
-        package='rclcpp_components',
-        executable='component_container_mt',
+        name="isaac_perception_container",
+        namespace="humanoid",
+        package="rclcpp_components",
+        executable="component_container_mt",
         composable_node_descriptions=[
             # 1. cuVSLAM Stereo Visual-Inertial Odometry
             ComposableNode(
-                package='isaac_ros_visual_slam',
-                plugin='nvidia::isaac_ros::visual_slam::VisualSlamNode',
-                name='visual_slam_node',
+                package="isaac_ros_visual_slam",
+                plugin="nvidia::isaac_ros::visual_slam::VisualSlamNode",
+                name="visual_slam_node",
                 parameters=[{
-                    'enable_image_denoising': False,
-                    'rectified_images': True,
-                    'enable_imu_fusion': True,
-                    'gyro_noise_density': 0.000244,
-                    'accel_noise_density': 0.001862,
-                    'calibration_frequency': 200.0,
-                    'image_jitter_threshold_ms': 25.0,
-                    'base_frame': 'base_link',
-                    'odom_frame': 'odom',
-                    'map_frame': 'map',
-                    'enable_slam_visualization': True,
-                    'enable_landmarks_view': True,
-                    'enable_observations_view': True
+                    "enable_image_denoising": False,
+                    "rectified_images": True,
+                    "enable_imu_fusion": True,
+                    "gyro_noise_density": 0.000244,
+                    "accel_noise_density": 0.001862,
+                    "calibration_frequency": 200.0,
+                    "image_jitter_threshold_ms": 25.0,
+                    "base_frame": "base_link",
+                    "odom_frame": "odom",
+                    "map_frame": "map",
+                    "enable_slam_visualization": True,
+                    "enable_landmarks_view": True,
+                    "enable_observations_view": True
                 }],
                 remappings=[
-                    ('stereo_camera/left/image', '/humanoid/camera/left/image_rect'),
-                    ('stereo_camera/left/camera_info', '/humanoid/camera/left/camera_info'),
-                    ('stereo_camera/right/image', '/humanoid/camera/right/image_rect'),
-                    ('stereo_camera/right/camera_info', '/humanoid/camera/right/camera_info'),
-                    ('visual_slam/imu', '/humanoid/sensors/imu/data')
+                    ("stereo_camera/left/image", "/humanoid/camera/left/image_rect"),
+                    ("stereo_camera/left/camera_info", "/humanoid/camera/left/camera_info"),
+                    ("stereo_camera/right/image", "/humanoid/camera/right/image_rect"),
+                    ("stereo_camera/right/camera_info", "/humanoid/camera/right/camera_info"),
+                    ("visual_slam/imu", "/humanoid/sensors/imu/pelvis/data_raw")
                 ]
             ),
             # 2. nvblox Real-Time 3D TSDF Reconstruction
             ComposableNode(
-                package='nvblox_ros',
-                plugin='nvblox::NvbloxNode',
-                name='nvblox_node',
+                package="nvblox_ros",
+                plugin="nvblox::NvbloxNode",
+                name="nvblox_node",
                 parameters=[{
-                    'voxel_size': 0.05,
-                    'esdf_slice_height': 0.1,
-                    'esdf_2d_min_height': 0.0,
-                    'esdf_2d_max_height': 1.8,
-                    'global_frame': 'odom',
-                    'mesh_update_rate_hz': 10.0,
-                    'esdf_update_rate_hz': 20.0
+                    "voxel_size": 0.05,
+                    "esdf_slice_height": 0.1,
+                    "esdf_2d_min_height": 0.0,
+                    "esdf_2d_max_height": 1.8,
+                    "global_frame": "odom",
+                    "mesh_update_rate_hz": 10.0,
+                    "esdf_update_rate_hz": 20.0
                 }],
                 remappings=[
-                    ('depth/image', '/humanoid/camera/depth/image_raw'),
-                    ('depth/camera_info', '/humanoid/camera/depth/camera_info')
+                    ("depth/image", "/humanoid/camera/depth/image_raw"),
+                    ("depth/camera_info", "/humanoid/camera/depth/camera_info")
                 ]
             )
         ],
-        output='screen'
+        output="screen"
     )
 
     return LaunchDescription([perception_container])
@@ -165,169 +216,192 @@ def generate_launch_description():
 
 ---
 
-## 4. Exercise 2: Discrete Bipedal Footstep Planning with Nav2
+## 5. Automated Trajectory Verification Harness (Umeyama Alignment)
 
-Wheeled robots project footprint circles onto 2D costmaps. Humanoid robots require **discrete stance sequence generation** where each step must satisfy kinematic reachability and ground contact friction cones.
-
-The cost function for evaluating step candidate `S_k = (x_k, y_k, theta_k)` is formulated as:
-
-```text
-J(S_k) = w_g * ||S_k - S_goal||^2 + w_t * ||S_k - S_{k-1}||^2 + w_h * (h(x_k, y_k) - h_ref)^2 + C_obstacle(S_k)
-```
-
-Where:
-- `w_g` penalizes distance to target goal.
-- `w_t` enforces smooth stride cadence.
-- `w_h` penalizes terrain slope and elevation changes.
-- `C_obstacle(S_k)` is derived from the nvblox Euclidean Signed Distance Field (ESDF).
-
-### Footstep Planner Plugin Configuration (`footstep_planner.yaml`)
-
-```yaml
-humanoid_footstep_planner:
-  ros__parameters:
-    expected_planner_frequency: 10.0
-    footstep_planner:
-      plugin: "humanoid_nav2_planners/FootstepLatticePlanner"
-      max_stride_x: 0.35        # Forward reachability limit (meters)
-      min_stride_x: -0.15       # Backward recovery step limit
-      max_stride_y: 0.28        # Lateral step limit
-      min_stride_y: 0.15        # Minimum foot clearance to prevent self-collision
-      max_stride_theta: 0.35    # Maximum yaw angle per footstep (radians)
-      step_height_clearance: 0.08
-      heuristic_weight: 1.2     # Epsilon-admissible ARA* acceleration
-      max_planning_time_ms: 100.0
-```
-
----
-
-## 5. Exercise 3: Real-Time Whole-Body Stabilization Bridge
-
-When Nav2 outputs a target footstep sequence, the whole-body controller must generate dynamically stable joint torque commands. The controller tracks the **Capture Point (CP)** to ensure the center of pressure (CoP) remains strictly inside the convex polygon of the stance foot:
-
-```text
-x_CP = x_CoM + (v_CoM / omega_0), where omega_0 = sqrt(g / z_CoM)
-```
-
-Create `biped_wbc_bridge.py` to bridge Nav2 footsteps into low-level torque trajectories:
+Below is a complete, production-grade Python evaluation script that reads estimated state odometry and ground-truth motion capture data, computes optimal $SE(3)$ Umeyama alignment, and outputs $\text{ATE}_{\text{RMSE}}$ and $\text{RPE}$ metrics:
 
 ```python
-import rclpy
-from rclpy.node import Node
-from geometry_msgs.msg import PoseArray, WrenchStamped
-from sensor_msgs.msg import JointState
+"""
+evaluate_trajectory_benchmark.py
+Computes Absolute Trajectory Error (ATE RMSE) and Relative Pose Error (RPE)
+using Umeyama rigid SE(3) alignment.
+"""
+
+from typing import Tuple
 import numpy as np
 
-class BipedWholeBodyController(Node):
-    def __init__(self):
-        super().__init__('biped_wbc_bridge')
-        
-        # 1 kHz real-time timer
-        self.control_timer = self.create_timer(0.001, self.control_loop_callback)
-        
-        # Subscriptions
-        self.footstep_sub = self.create_subscription(
-            PoseArray, '/humanoid/planned_footsteps', self.footstep_callback, 10
-        )
-        self.joint_sub = self.create_subscription(
-            JointState, '/humanoid/joint_states', self.joint_callback, 10
-        )
-        
-        # Actuator torque publisher
-        self.torque_pub = self.create_publisher(
-            JointState, '/humanoid/joint_torques_cmd', 10
-        )
-        
-        # State variables
-        self.g = 9.81
-        self.z_com = 0.82  # Nominal CoM height in meters
-        self.omega_0 = np.sqrt(self.g / self.z_com)
-        self.com_pos = np.array([0.0, 0.0, self.z_com])
-        self.com_vel = np.array([0.0, 0.0, 0.0])
-        self.current_footsteps = []
 
-    def footstep_callback(self, msg: PoseArray):
-        self.get_logger().info(f"Received new footstep trajectory with {len(msg.poses)} steps.")
-        self.current_footsteps = [(p.position.x, p.position.y) for p in msg.poses]
+def compute_umeyama_alignment(
+    model: np.ndarray, data: np.ndarray
+) -> Tuple[np.ndarray, np.ndarray, float]:
+    """
+    Computes optimal rigid alignment transformation (R, t, scale)
+    between two corresponding 3D point sets using Umeyama's algorithm.
+    model: (3, N) estimated trajectory positions
+    data:  (3, N) ground truth trajectory positions
+    """
+    assert model.shape == data.shape
+    num_points = model.shape[1]
 
-    def joint_callback(self, msg: JointState):
-        self.current_joint_pos = np.array(msg.position)
-        self.current_joint_vel = np.array(msg.velocity)
+    mean_model = np.mean(model, axis=1, keepdims=True)
+    mean_data = np.mean(data, axis=1, keepdims=True)
 
-    def control_loop_callback(self):
-        # 1. Calculate Instantaneous Capture Point (ICP)
-        capture_point = self.com_pos[:2] + (self.com_vel[:2] / self.omega_0)
-        
-        # 2. Formulate QP Objective: minimize tracking error + actuator effort
-        # argmin_u 0.5 * ||u - u_nom||^2_Q + 0.5 * ||x_CP - x_des||^2_R
-        # subject to: Friction Cone Constraints & Joint Torque Saturation
-        
-        # Publish dummy stabilizing torques (abridged for brevity)
-        torque_cmd = JointState()
-        torque_cmd.header.stamp = self.get_clock().now().to_msg()
-        torque_cmd.name = ['left_hip_pitch', 'left_knee', 'left_ankle_pitch',
-                           'right_hip_pitch', 'right_knee', 'right_ankle_pitch']
-        torque_cmd.effort = [12.5, -24.2, 8.1, 11.8, -23.9, 7.9]
-        self.torque_pub.publish(torque_cmd)
+    model_centered = model - mean_model
+    data_centered = data - mean_data
 
-def main():
-    rclpy.init()
-    node = BipedWholeBodyController()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    node.destroy_node()
-    rclpy.shutdown()
+    var_model = np.var(model, axis=1).sum()
 
-if __name__ == '__main__':
-    main()
+    # Cross-covariance matrix
+    covariance = (data_centered @ model_centered.T) / num_points
+
+    u, d, vt = np.linalg.svd(covariance)
+    s = np.eye(3)
+    if np.linalg.det(u) * np.linalg.det(vt) < 0:
+        s[2, 2] = -1.0
+
+    r_opt = u @ s @ vt
+    scale_opt = 1.0  # Rigid isometry constraint for SLAM evaluation
+
+    t_opt = mean_data - scale_opt * (r_opt @ mean_model)
+
+    return r_opt, t_opt, scale_opt
+
+
+def calculate_ate_rmse(estimated_xyz: np.ndarray, ground_truth_xyz: np.ndarray) -> float:
+    """
+    Calculates ATE RMSE after rigid Umeyama alignment.
+    Both inputs must be shape (N, 3).
+    """
+    assert estimated_xyz.shape == ground_truth_xyz.shape
+    est_t = estimated_xyz.T  # (3, N)
+    gt_t = ground_truth_xyz.T   # (3, N)
+
+    r_opt, t_opt, _ = compute_umeyama_alignment(est_t, gt_t)
+    aligned_est = r_opt @ est_t + t_opt
+
+    squared_errors = np.sum((gt_t - aligned_est) ** 2, axis=0)
+    ate_rmse = float(np.sqrt(np.mean(squared_errors)))
+    return ate_rmse
+
+
+def calculate_rpe(
+    estimated_xyz: np.ndarray, ground_truth_xyz: np.ndarray, step_interval: int = 10
+) -> float:
+    """
+    Calculates translational Relative Pose Error over a fixed step interval.
+    """
+    errors = []
+    n_points = len(estimated_xyz)
+    for i in range(n_points - step_interval):
+        delta_est = estimated_xyz[i + step_interval] - estimated_xyz[i]
+        delta_gt = ground_truth_xyz[i + step_interval] - ground_truth_xyz[i]
+        errors.append(np.linalg.norm(delta_est - delta_gt))
+
+    return float(np.sqrt(np.mean(np.array(errors) ** 2)))
+
+
+if __name__ == "__main__":
+    print("=" * 65)
+    print("Trajectory Evaluation Harness (Umeyama SE(3) Alignment)")
+    print("=" * 65)
+
+    # Generate synthetic 100-step walking trajectory with injected sensor drift
+    t = np.linspace(0, 10, 200)
+    gt_x = 0.5 * t
+    gt_y = 0.1 * np.sin(2.0 * t)  # Torso sway
+    gt_z = 0.85 + 0.02 * np.cos(4.0 * t)  # Vertical oscillation
+    ground_truth = np.vstack([gt_x, gt_y, gt_z]).T
+
+    # Simulate SLAM estimate with slight drift and noise
+    drift = 0.005 * t
+    noise = np.random.normal(0.0, 0.008, ground_truth.shape)
+    estimated = ground_truth + np.column_stack([drift, drift, np.zeros_like(t)]) + noise
+
+    ate = calculate_ate_rmse(estimated, ground_truth)
+    rpe = calculate_rpe(estimated, ground_truth, step_interval=10)
+
+    print(f"Sample Points Evaluated:  {len(ground_truth)}")
+    print(f"Absolute Trajectory Error (ATE RMSE): {ate * 100.0:.2f} cm")
+    print(f"Relative Pose Error (RPE trans):      {rpe * 100.0:.2f} cm / interval")
+    
+    threshold_ate = 0.05  # 5 cm threshold
+    if ate <= threshold_ate:
+        print("[PASS] Visual Odometry meets bipedal walking precision specifications.")
+    else:
+        print("[FAIL] Visual Odometry exceeds maximum allowable drift.")
+    print("=" * 65)
 ```
 
 ---
 
-## 6. Execution & Verification
+## 6. Summary & Seminal Literature
 
-### Step 1: Start Isaac Sim with the ROS 2 Extension
-Launch Omniverse Isaac Sim with the warehouse demo USD:
-```bash
-./isaac-sim.sh --allow-root --exec "omniverse://localhost/NVIDIA/Assets/Isaac/4.0/Isaac/Environments/Simple_Warehouse/warehouse.usd"
-```
+This capstone project validates the complete perception-to-locomotion autonomy stack. By pairing hardware-accelerated visual odometry with 3D elevation costmaps, discrete footstep lattice planners, and 1 kHz whole-body controllers, you have implemented the software hierarchy used in state-of-the-art physical AI humanoids.
 
-### Step 2: Launch the Integrated Pipeline
-```bash
-# In Terminal 1: Launch Perception Stack
-ros2 launch humanoid_perception isaac_humanoid_perception.launch.py
-
-# In Terminal 2: Launch Nav2 Footstep Planner
-ros2 launch humanoid_navigation biped_nav2.launch.py
-
-# In Terminal 3: Launch Whole-Body Controller
-python3 biped_wbc_bridge.py
-```
-
-### Step 3: Monitor Telemetry in RViz2
-Add the following displays to RViz2:
-1. `Map`: Topic `/visual_slam/tracking/slam_path`
-2. `PointCloud2`: Topic `/nvblox_node/mesh_slice`
-3. `PoseArray`: Topic `/humanoid/planned_footsteps`
-4. `Odometry`: Topic `/visual_slam/tracking/odometry`
-
-Observe cuVSLAM maintaining millimeter-accurate pose estimation across dynamic camera occlusions while the robot executes planned footsteps across non-flat terrain.
+### Seminal Research Citations
+1. **Sturm, J., Engelhard, N., Endres, F., Burgard, W., & Cremers, D. (2012).** *A benchmark for the evaluation of RGB-D SLAM systems*. IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS).
+2. **Umeyama, S. (1991).** *Least-squares estimation of transformation parameters between two point patterns*. IEEE Transactions on Pattern Analysis and Machine Intelligence, 13(4), 376–380.
+3. **Furgale, P., Barfoot, T. D., & Sibley, G. (2013).** *Continuous-time batch estimation using temporal basis functions*. IEEE Transactions on Robotics, 28(6), 1326–1339.
 
 ---
 
-## 7. Industrial Case Study: Real-World Deployment Challenges
+<ChapterProgress chapterId="3-5-hands-on-exercises" moduleId="module3" totalChapters={10} />
 
-| Metric / Challenge | Academic Simulation | Figure 02 / Tesla Optimus Production | Mitigation Strategy |
-| :--- | :--- | :--- | :--- |
-| **Visual Blur & Vibration** | Clean ray-traced pixels | Severe head shaking during heel strikes | Hardware IMU-trigger sync + optical image stabilization |
-| **Foot Impact Shock** | Perfect rigid-body contact | Instantaneous 2.5G deceleration spike | Viscoelastic foot sole dampers + low-pass torque filtering |
-| **Compute Power Envelope** | Multi-GPU server (800 W) | Onboard dual Orin / custom FSD SoC (120 W) | INT8 TensorRT quantization + zero-copy NITROS IPC |
-| **Latency Jitter** | Fixed timestep (e.g. 10 ms) | Variable OS scheduling delays (up to 15 ms) | Linux PREEMPT_RT kernel + core isolation for WBC threads |
+## Chapter Mastery Check
 
----
-
-## Summary
-
-In this project, you implemented the complete **Perception-to-Locomotion Loop** that powers modern humanoid robots. By coupling hardware-accelerated visual odometry (Isaac ROS cuVSLAM) with real-time 3D reconstruction (nvblox), discrete lattice planning (Nav2), and high-frequency whole-body stabilization (QP-WBC), you constructed the foundational software hierarchy used by world-leading robotics labs.
+<QuizEngine
+  quizId="quiz-3-5"
+  title="Module 3.5 Mastery Check: Lab Projects & Verification"
+  moduleId="module3"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why is Umeyama SE(3) rigid body alignment computed before calculating Absolute Trajectory Error (ATE)?",
+      options: [
+        "To artificially reduce the measured error to zero",
+        "To transform the estimated trajectory from the arbitrary initial visual odometry coordinate frame into the global motion capture ground-truth frame",
+        "To invert the camera calibration matrix",
+        "To convert position coordinates into motor drive PWM values"
+      ],
+      correctIndex: 1,
+      explanation: "Visual SLAM systems initialize their world frame arbitrarily at startup. Umeyama alignment calculates the rigid rotation and translation that maps the estimated trajectory into the ground-truth coordinate system."
+    },
+    {
+      id: "q2",
+      question: "What is the primary difference between Absolute Trajectory Error (ATE) and Relative Pose Error (RPE)?",
+      options: [
+        "ATE measures global trajectory consistency across the entire trial, whereas RPE measures local drift and velocity errors over a fixed time interval",
+        "ATE only applies to wheeled robots, whereas RPE applies to quadrupeds",
+        "ATE requires an IMU, whereas RPE requires a lidar",
+        "ATE is computed in 2D, whereas RPE is computed in 6D"
+      ],
+      correctIndex: 0,
+      explanation: "ATE quantifies total drift across the complete journey (evaluating global SLAM and loop closures), while RPE evaluates the frame-to-frame tracking stability and local drift rate per unit of time or distance."
+    },
+    {
+      id: "q3",
+      question: "In the Kalibr continuous-time sensor calibration framework, how are temporal latency offsets between cameras and IMUs modeled?",
+      options: [
+        "As discrete random jumps",
+        "Using continuous B-spline basis functions that allow analytical differentiation and sub-millisecond time-shift optimization",
+        "By discarding all IMU readings between image exposures",
+        "By running both sensors on separate Ethernet subnets"
+      ],
+      correctIndex: 1,
+      explanation: "Kalibr uses continuous B-splines to parameterize the trajectory, enabling analytical time derivatives and gradient-based optimization of temporal offsets down to fractions of a millisecond."
+    },
+    {
+      id: "q4",
+      question: "Why should cuVSLAM and nvblox be executed inside a single ComposableNodeContainer on Jetson platforms?",
+      options: [
+        "To allow them to share CPU thread priority",
+        "To enable zero-copy GPU pointer passing in shared memory via NITROS, eliminating inter-process buffer duplication",
+        "To avoid needing a ROS 2 workspace",
+        "To reduce camera focal length automatically"
+      ],
+      correctIndex: 1,
+      explanation: "When nodes reside within the same ComposableNodeContainer, NITROS swaps CUDA memory pointers directly in-process, eliminating serialization and memory copies between perception components."
+    }
+  ]}
+/>
