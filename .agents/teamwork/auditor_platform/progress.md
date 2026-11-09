@@ -1,0 +1,21 @@
+# Progress — Milestone M1 Forensic Audit
+
+- Last visited: 2026-11-09T14:58:00Z
+- Status: Completed (INTEGRITY VIOLATION)
+- Active Step: Authoring handoff report and communicating verdict to parent orchestrator.
+- Completed Checks:
+  - Phase 1 Static Analysis: ALL PASS
+    - `backend/app/routes/chat.py` & `backend/app/agent/agent_service.py`: Genuine SSE streaming implementation.
+    - `backend/app/routes/analytics.py`: Genuine disk-backed JSONL logging and dynamic aggregations.
+    - `backend/app/retriever/retriever_service.py`: Genuine Qdrant module filtering.
+    - `backend/ingest_docs.py`: Genuine SHA-256 manifests and UUID5 chunk IDs.
+    - `src/components/ChapterProgress/` & `src/components/QuizEngine/`: Genuine, interactive React components with localStorage and telemetry.
+  - Phase 2 Test Suite Authenticity: PARTIAL PASS / VIOLATION
+    - Unit tests in `backend/tests/` assert genuine contracts.
+    - `TEST_READY.md` attested 100% hermetic tests with zero reliance on live API keys.
+  - Phase 3 Execution Validation: FAIL
+    - `npm run typecheck`: PASS (exit code 0)
+    - `npm run build`: PASS (exit code 0)
+    - `cd backend; uv run pytest -v`: FAIL (exit code 1)
+    - `python run_e2e_tests.py`: FAIL (exit code 1)
+    - Root cause: `backend/tests/e2e/test_tier1_backend_coverage.py::test_ask_sse_streaming_mode` calls live Google Gemini API without hermetic mocks, triggering `google.genai.errors.ClientError: 429 RESOURCE_EXHAUSTED` and aborting test execution.
