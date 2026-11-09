@@ -59,6 +59,62 @@ const MODULE4_PROMPTS: QuickPrompt[] = [
   { tag: '3D Affordance', query: 'How does 3D spatial grounding predict grasp affordances for humanoid dexterous hands?' },
 ];
 
+const MODULE5_PROMPTS: QuickPrompt[] = [
+  { tag: 'Forward Kinematics', query: 'How does the Product of Exponentials (PoE) Lie group formulation improve humanoid forward kinematics?' },
+  { tag: 'Inverse Kinematics', query: 'How does null-space projection resolve kinematic redundancy for 7-DOF humanoid arms?' },
+  { tag: 'Rigid Body Dynamics', query: 'How does Featherstone Articulated Body Algorithm (ABA) achieve O(n) forward dynamics?' },
+  { tag: 'Spatial Vectors', query: 'Explain 6D spatial vector algebra for spatial velocity, force, and spatial inertia.' },
+];
+
+const MODULE6_PROMPTS: QuickPrompt[] = [
+  { tag: 'Zero-Moment Point', query: 'Derive the 3D Linear Inverted Pendulum Model (3D-LIPM) and Kajita preview control equations.' },
+  { tag: 'Capture Point', query: 'How do Instantaneous Capture Point (ICP) and Divergent Component of Motion (DCM) stabilize bipedal push recovery?' },
+  { tag: 'Convex MPC', query: 'How does real-time convex MPC compute ground reaction forces at 500 Hz for legged locomotion?' },
+  { tag: 'Whole-Body Control', query: 'How does QP-based whole-body control enforce contact friction cone constraints?' },
+];
+
+const MODULE7_PROMPTS: QuickPrompt[] = [
+  { tag: 'Grasp Theory', query: 'What is the mathematical condition for force closure in grasp wrench space analysis?' },
+  { tag: 'Hand Design', query: 'Compare tendon-driven underactuated hands with fully actuated dexterous hands.' },
+  { tag: 'GelSight Tactile', query: 'How does GelSight optical tactile sensing reconstruct high-resolution contact depth?' },
+  { tag: 'MoveIt 2', query: 'How does MoveIt 2 integrate OMPL and Riemannian Motion Policies for obstacle avoidance?' },
+];
+
+const MODULE8_PROMPTS: QuickPrompt[] = [
+  { tag: 'PPO for Locomotion', query: 'Explain PPO clipped surrogate objective and reward shaping for humanoid walking.' },
+  { tag: 'Isaac Lab Scale', query: 'How does Isaac Lab train 4,096 vectorized GPU environments in parallel?' },
+  { tag: 'Curriculum Learning', query: 'How does automatic curriculum learning schedule progressive terrain difficulty?' },
+  { tag: 'World Models', query: 'How do latent world models like Dreamer V3 enable sample-efficient robot learning?' },
+];
+
+const MODULE9_PROMPTS: QuickPrompt[] = [
+  { tag: 'Reality Gap', query: 'What are the primary sources of the sim-to-real gap in humanoid locomotion and manipulation?' },
+  { tag: 'Domain Randomization', query: 'How does Adaptive Domain Randomization (ADR) expand parameter ranges during training?' },
+  { tag: 'Rapid Motor Adaptation', query: 'How does the RMA two-stage teacher-student architecture adapt to unknown friction online?' },
+  { tag: 'System Identification', query: 'How are actuator dynamics and LuGre friction identified from robot telemetry logs?' },
+];
+
+const MODULE10_PROMPTS: QuickPrompt[] = [
+  { tag: 'QDD Actuators', query: 'Why are Quasi-Direct Drive (QDD) actuators preferred for high-impact bipedal legs?' },
+  { tag: 'Field Oriented Control', query: 'Explain the Clarke and Park transforms in Field Oriented Control (FOC) motor inverters.' },
+  { tag: 'EtherCAT & CAN-FD', query: 'Why is EtherCAT preferred over CAN-FD for sub-millisecond 1 kHz joint synchronization?' },
+  { tag: 'Jetson Compute', query: 'How does the NVIDIA Jetson AGX Orin split workloads across CPU, Tensor Cores, and DLAs?' },
+];
+
+const MODULE11_PROMPTS: QuickPrompt[] = [
+  { tag: 'Safety Standards', query: 'How do ISO 10218, ISO/TS 15066, and ISO 13849 apply to humanoid robot safety?' },
+  { tag: 'Physical HRI', query: 'How do momentum observers and power-and-force limiting prevent injury during human contact?' },
+  { tag: 'Functional Safety', query: 'Explain Safety Integrity Level (SIL 2) dual-channel architecture for humanoid E-stops.' },
+  { tag: 'Ethics & Privacy', query: 'What are the privacy and data governance requirements for autonomous humanoids in public spaces?' },
+];
+
+const MODULE12_PROMPTS: QuickPrompt[] = [
+  { tag: 'Full-Stack Capstone', query: 'Outline the architectural pipeline for an autonomous tabletop manipulation capstone.' },
+  { tag: 'Loco-Manipulation', query: 'What are the key research frontiers in simultaneous bipedal walking and manipulation?' },
+  { tag: 'Gaussian Splatting', query: 'How does 3D Gaussian Splatting enable real-time novel view synthesis for robot perception?' },
+  { tag: 'Humanoid Roadmap', query: 'What are the projected engineering milestones for general-purpose humanoids through 2030?' },
+];
+
 function formatSourceUrl(src: string): string {
   return src.replace(/\.mdx?$/, '');
 }
@@ -173,7 +229,7 @@ export default function FloatingAssistant(): React.ReactElement | null {
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
-      text: 'Hello! I am your AI Robotics Tutor. I am grounded in all 26 chapters of this book. Ask me anything about ROS 2, Gazebo physics, NVIDIA Isaac, or Vision-Language-Action systems!',
+      text: 'Hello! I am your AI Robotics Tutor. I am grounded in all 110 chapters across 12 modules of this curriculum. Ask me anything about ROS 2, Gazebo & Unity digital twins, NVIDIA Isaac perception, Vision-Language-Action systems, bipedal locomotion, or robot learning!',
       sender: 'agent',
       timestamp: new Date(),
     },
@@ -194,6 +250,14 @@ export default function FloatingAssistant(): React.ReactElement | null {
     if (path.includes('module2-digital-twin')) return MODULE2_PROMPTS;
     if (path.includes('module3-ai-robot-brain')) return MODULE3_PROMPTS;
     if (path.includes('module4-vla')) return MODULE4_PROMPTS;
+    if (path.includes('module5-kinematics')) return MODULE5_PROMPTS;
+    if (path.includes('module6-bipedal')) return MODULE6_PROMPTS;
+    if (path.includes('module7-dexterous')) return MODULE7_PROMPTS;
+    if (path.includes('module8-robot')) return MODULE8_PROMPTS;
+    if (path.includes('module9-sim')) return MODULE9_PROMPTS;
+    if (path.includes('module10-hardware')) return MODULE10_PROMPTS;
+    if (path.includes('module11-safety')) return MODULE11_PROMPTS;
+    if (path.includes('module12-capstone')) return MODULE12_PROMPTS;
     return GENERAL_PROMPTS;
   }, [isBrowser, isOpen]);
 
@@ -263,13 +327,23 @@ export default function FloatingAssistant(): React.ReactElement | null {
 
     try {
       const backendUrl = getBackendUrl();
+      let currentModule: string | undefined;
+      if (typeof window !== 'undefined') {
+        const match = window.location.pathname.match(/module(\d+)/i);
+        if (match) currentModule = `module${match[1]}`;
+      }
+
       const response = await fetch(`${backendUrl}/ask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Accept: 'application/json',
+          Accept: 'text/event-stream, application/json',
         },
-        body: JSON.stringify({ query_text: query }),
+        body: JSON.stringify({
+          query_text: query,
+          stream: true,
+          module_filter: currentModule,
+        }),
       });
 
       if (!response.ok) {
@@ -283,16 +357,101 @@ export default function FloatingAssistant(): React.ReactElement | null {
         throw new Error(detail);
       }
 
-      const data: AskResponse = await response.json();
-      const agentMessage: ChatMessage = {
-        id: generateId(),
-        text: data.answer_text,
-        sender: 'agent',
-        timestamp: new Date(),
-        sources: data.retrieved_sources?.length > 0 ? data.retrieved_sources : undefined,
-      };
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/event-stream') && response.body) {
+        // SSE Streaming Handler
+        const agentMsgId = generateId();
+        let streamedText = '';
+        let streamedSources: string[] | undefined = undefined;
 
-      setMessages((prev) => [...prev, agentMessage]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: agentMsgId,
+            text: '',
+            sender: 'agent',
+            timestamp: new Date(),
+          },
+        ]);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split('\n\n');
+          buffer = parts.pop() || '';
+
+          for (const block of parts) {
+            const trimmed = block.trim();
+            if (!trimmed) continue;
+            let eventType = 'message';
+            let eventData = '';
+
+            for (const line of trimmed.split('\n')) {
+              if (line.startsWith('event:')) {
+                eventType = line.replace('event:', '').trim();
+              } else if (line.startsWith('data:')) {
+                eventData = line.replace('data:', '').trim();
+              }
+            }
+
+            if (eventType === 'sources') {
+              try {
+                const parsed = JSON.parse(eventData);
+                if (parsed.sources && Array.isArray(parsed.sources)) {
+                  streamedSources = parsed.sources;
+                }
+              } catch {
+                // ignore source parse
+              }
+            } else if (eventType === 'token') {
+              try {
+                const parsed = JSON.parse(eventData);
+                if (parsed.token !== undefined) {
+                  streamedText += parsed.token;
+                }
+              } catch {
+                streamedText += eventData;
+              }
+            } else if (eventType === 'error') {
+              try {
+                const parsed = JSON.parse(eventData);
+                streamedText += `\n[Stream Error: ${parsed.error || 'Server error'}]`;
+              } catch {
+                streamedText += `\n[Stream Error: ${eventData}]`;
+              }
+            }
+
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === agentMsgId
+                  ? {
+                      ...msg,
+                      text: streamedText,
+                      sources: streamedSources,
+                    }
+                  : msg
+              )
+            );
+          }
+        }
+      } else {
+        // Unary Fallback
+        const data: AskResponse = await response.json();
+        const agentMessage: ChatMessage = {
+          id: generateId(),
+          text: data.answer_text,
+          sender: 'agent',
+          timestamp: new Date(),
+          sources: data.retrieved_sources?.length > 0 ? data.retrieved_sources : undefined,
+        };
+
+        setMessages((prev) => [...prev, agentMessage]);
+      }
     } catch (err) {
       console.error('[FloatingAssistant] Query error:', err);
       const errorMsg =
