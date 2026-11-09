@@ -160,7 +160,7 @@ a_i = (^i X_{lambda(i)}) * a_{lambda(i)} + S_i * ddq_i + c_i
 | :--- | :--- | :--- | :--- | :--- |
 | **RNEA** | Inverse Dynamics `(q, dq, ddq) -> tau` | `O(n)` | 8 us | 1 kHz feedforward torque control, gravity compensation |
 | **CRBA** | Generalized Mass Matrix `M(q)` | `O(n^2)` | 45 us | Quadratic Programming Whole-Body Control (WBC) |
-| **Cholesky (M^{-1})** | Naive Forward Dynamics via Matrix Inversion | `O(n^3)` | 180 us | Offline analysis, small kinematic chains |
+| **Cholesky ($M^{-1}$)** | Naive Forward Dynamics via Matrix Inversion | `O(n^3)` | 180 us | Offline analysis, small kinematic chains |
 | **Featherstone ABA** | Forward Dynamics `(q, dq, tau) -> ddq` | `O(n)` | 22 us | Physics engines, high-speed digital twin simulation |
 
 ---

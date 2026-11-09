@@ -4,197 +4,397 @@ title: "Multimodal Interaction: Vision, Deictic Gestures, and 3D Affordances"
 description: "Advanced multimodal interaction for humanoid robots: 3D deictic gesture ray-casting, human gaze tracking, zero-shot 6-DoF pose estimation with FoundationPose, and conversational disambiguation loops."
 ---
 
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
+
 # Multimodal Interaction: Vision, Deictic Gestures, and 3D Affordances
 
-Human communication is intrinsically multimodal. In daily factory or household interactions, people rarely say: `"Navigate to coordinates (x=3.42, y=1.15) and pick up the cylindrical object with RGB value (0.8, 0.1, 0.1)"`. Instead, a human points across the room and says: `"Hey, can you grab *that* cup over there?"`
+When humans collaborate in shared workspaces, communication relies heavily on **deictic references**—spatial cues that depend on shared context, such as pointing toward a tabletop while saying: *"Pass me that tool, please."* 
 
-To operate effectively alongside humans, a humanoid robot must fuse **acoustic speech**, **3D vision**, **human skeletal tracking**, and **3D spatial scene geometry** to resolve ambiguous deictic references (words like *this*, *that*, *there*, *here*).
+For an autonomous humanoid robot, resolving *"that tool"* requires fusing auditory speech transcripts, 3D spatial human skeletal poses, depth perception, and open-vocabulary visual semantic grounding. If the robot misinterprets the pointing angle or fails to disambiguate two adjacent wrenches, catastrophic manipulation errors can occur.
 
 ---
 
-## 1. Multimodal Deictic Fusion Architecture
+## Learning Objectives
 
-The multimodal perception pipeline reconciles human intent with 3D physical coordinate frames:
+After completing this chapter, you will be able to:
+- Formulate camera pinhole projection and unprojection transformations between pixel coordinates and 3D metric camera frames.
+- Derive the 3D pointing ray vector equation and conical Gaussian scoring law for candidate object selection.
+- Implement zero-shot 6-DoF object pose estimation pipelines using FoundationPose principles.
+- Design active head gaze tracking kinematics for 2-DoF pan-tilt camera gimbals.
+- Deploy an end-to-end Python multimodal grounding node resolving ambiguous spatial queries.
+
+---
+
+## 1. Multimodal Grounding Pipeline Architecture
+
+The multimodal disambiguation pipeline transforms raw multimodal sensor streams into a verified 6-DoF target grasp pose:
 
 ```mermaid
 flowchart TD
-    subgraph SensoryInputs ["Multimodal Sensor Feeds"]
-        RGBD["Stereo RGB-D Camera Stream"]
-        Audio["Directional Microphone Stream"]
+    subgraph SensoryInputs ["Multimodal Sensor Ingestion"]
+        RGBD["Intel RealSense D455<br/>(1280x720 RGB-D @ 30 FPS)"]
+        MicArray["Headset Audio Stream"]
     end
 
-    subgraph ModalityParsers ["Parallel Feature Extractors"]
-        ASR["Streaming ASR (Whisper / Riva)<br/>'Grab that cup'"]
-        Pose3D["3D Human Skeleton Estimator<br/>(ViTPose / MediaPipe 3D)"]
-        SceneSeg["Zero-Shot 3D Segmentation<br/>(Segment Anything / SAM-3D)"]
+    subgraph PerceptionLayer ["Spatial Perception & Tracking"]
+        RGBD --> Skeleton["Human Pose Estimator<br/>(RTMPose / MediaPipe 3D)"]
+        RGBD --> Segment["Open-Vocabulary Detector<br/>(Grounding DINO + SAM 2)"]
+        MicArray --> ASR["Whisper Streaming ASR"]
     end
 
-    subgraph DeicticCore ["3D Spatial Grounding Engine"]
-        RayCast["Pointing Ray Formulation<br/>(Shoulder -> Fingertip Ray)"]
-        ConeIntersect["Frustum / Cone Intersection with 3D Object Centroids"]
-        AmbiguityCheck{"Multiple Candidates Inside Cone?"}
+    subgraph GeometricFusion ["3D Spatial Deictic Fusion"]
+        Skeleton --> PointingRay["Ray-Casting: Shoulder -> Fingertip<br/>r(t) = p_f + t * d"]
+        Segment --> ObjectCentroids["3D Object Clusters & Centroids O = {o_1, ..., o_K}"]
+        ASR --> SemanticPrior["VLM Semantic Target Prior<br/>'target is a wrench'"]
+        PointingRay --> ConicalScorer["Conical Frustum Affordance Scorer<br/>S(o_i) = w_angle * E_ang + w_dist * E_dist + w_sem * P_vlm"]
+        ObjectCentroids --> ConicalScorer
+        SemanticPrior --> ConicalScorer
     end
 
-    subgraph ResolutionOutput ["Execution / Clarification"]
-        Pose6D["FoundationPose 6-DoF Pose Tracking"]
-        WBC_Grasp["ROS 2 Whole-Body Grasp Controller"]
-        DialogueTTS["Spoken Clarification Query<br/>'Do you mean the ceramic mug or the paper cup?'"]
+    subgraph MotorDispatch ["Target Pose Estimation"]
+        ConicalScorer --> BestTarget["Selected Object: Wrench #2"]
+        BestTarget --> Pose6D["FoundationPose 6-DoF Tracking<br/>T_{base}^{target} in SE(3)"]
+        Pose6D --> ArmPlanner["MoveIt 2 / Whole-Body Controller"]
     end
-
-    RGBD --> Pose3D
-    RGBD --> SceneSeg
-    Audio --> ASR
-    Pose3D --> RayCast
-    SceneSeg --> ConeIntersect
-    RayCast --> ConeIntersect
-    ConeIntersect --> AmbiguityCheck
-    AmbiguityCheck -- Single Match --> Pose6D
-    Pose6D --> WBC_Grasp
-    AmbiguityCheck -- Multiple Matches --> DialogueTTS
-    DialogueTTS --> Audio
 ```
 
 ---
 
-## 2. Mathematical Formulation of 3D Pointing Ray Casting
+## 2. Geometric Foundations: Projective Geometry & Ray Casting
 
-Resolving *"that object"* requires projecting the human's skeletal vectors into the robot's world coordinate frame `map` using the transform tree `tf2`.
+### Pinhole Camera Geometry & Depth Unprojection
+
+A calibrated depth sensor maps a 3D point $\mathbf{P}_{cam} = [X_c, Y_c, Z_c]^T$ in the optical camera frame to homogeneous pixel coordinates $\mathbf{p}_{img} = [u, v, 1]^T$ via the intrinsic camera matrix $\mathbf{K}$:
+
+$$
+\mathbf{p}_{img} = \begin{bmatrix} u \\ v \\ 1 \end{bmatrix} = \frac{1}{Z_c} \mathbf{K} \mathbf{P}_{cam} = \frac{1}{Z_c} \begin{bmatrix} f_x & 0 & c_x \\ 0 & f_y & c_y \\ 0 & 0 & 1 \end{bmatrix} \begin{bmatrix} X_c \\ Y_c \\ Z_c \end{bmatrix}
+$$
+
+Given pixel coordinates $(u, v)$ and registered metric depth $Z = D(u, v)$ from an RGB-D sensor, the exact 3D Cartesian coordinates in the camera optical frame are recovered via:
+
+$$
+\mathbf{P}_{cam} = Z \cdot \mathbf{K}^{-1} \begin{bmatrix} u \\ v \\ 1 \end{bmatrix} = \begin{bmatrix} \frac{(u - c_x) Z}{f_x} \\ \frac{(v - c_y) Z}{f_y} \\ Z \end{bmatrix}
+$$
+
+Transforming this point into the robot's base coordinate frame $\mathbf{P}_{base} \in SE(3)$ uses the kinematic forward transform $\mathbf{T}_{base}^{cam} = [\mathbf{R} \mid \mathbf{t}]$:
+
+$$
+\mathbf{P}_{base} = \mathbf{R}_{base}^{cam} \mathbf{P}_{cam} + \mathbf{t}_{base}^{cam}
+$$
+
+### 3D Deictic Pointing Ray Formulation
+
+When a human points at an object, their intention is geometrically represented by a 3D ray originating at the dominant eye or shoulder $\mathbf{p}_s \in \mathbb{R}^3$ passing through the index fingertip $\mathbf{p}_f \in \mathbb{R}^3$:
+
+$$
+\hat{\mathbf{d}} = \frac{\mathbf{p}_f - \mathbf{p}_s}{\|\mathbf{p}_f - \mathbf{p}_s\|_2}
+$$
+
+The parametric 3D pointing ray is:
+
+$$
+\mathbf{r}(t) = \mathbf{p}_f + t \hat{\mathbf{d}}, \quad t \ge 0
+$$
+
+```
+   Human Shoulder (p_s)
+          \
+           \
+            v
+       Fingertip (p_f) ------------ Pointing Ray d ----------->
+                                   \
+                                    \  theta_i
+                                     \
+                                      * Object Centroid (o_i)
+                                      |
+                                      | d_perp
+                                      v
+```
+
+### Conical Gaussian Scoring Law
+
+For each segmented candidate object centroid $\mathbf{o}_i \in \mathbb{R}^3$, the angular deviation $\theta_i$ relative to the pointing ray is:
+
+$$
+\theta_i = \arccos \left( \frac{(\mathbf{o}_i - \mathbf{p}_f) \cdot \hat{\mathbf{d}}}{\|\mathbf{o}_i - \mathbf{p}_f\|_2} \right)
+$$
+
+The perpendicular projection distance $d_i^\perp$ from centroid $\mathbf{o}_i$ to the infinite ray line is:
+
+$$
+d_i^\perp = \left\| (\mathbf{o}_i - \mathbf{p}_f) - \left( (\mathbf{o}_i - \mathbf{p}_f) \cdot \hat{\mathbf{d}} \right) \hat{\mathbf{d}} \right\|_2
+$$
+
+The total grounding score $S(\mathbf{o}_i)$ combines angular alignment, spatial proximity, and semantic VLM class probability:
+
+$$
+S(\mathbf{o}_i) = w_{ang} \exp\left( -\frac{\theta_i^2}{2 \sigma_\theta^2} \right) + w_{dist} \exp\left( -\frac{(d_i^\perp)^2}{2 \sigma_d^2} \right) + w_{sem} P_{VLM}(\text{class} \mid \mathbf{I}, \mathbf{o}_i)
+$$
+
+where $\sigma_\theta \approx 0.15 \text{ rad}$ ($8.6^\circ$) and $\sigma_d \approx 0.10 \text{ m}$ reflect human motor pointing uncertainty.
+
+---
+
+## 3. 6-DoF Pose Estimation with FoundationPose
+
+Once candidate object $\mathbf{o}^* = \arg\max_i S(\mathbf{o}_i)$ is isolated, robotic grasping requires tracking its full 6-DoF transformation matrix $\mathbf{T}_{base}^{obj} \in SE(3)$:
+
+$$
+\mathbf{T}_{base}^{obj} = \begin{bmatrix} \mathbf{R} & \mathbf{t} \\ \mathbf{0}^T & 1 \end{bmatrix}, \quad \mathbf{R} \in SO(3), \; \mathbf{t} \in \mathbb{R}^3
+$$
+
+### Unified Model-Based & Model-Free Tracking
+
+Modern architectures like **FoundationPose** (Wen et al., 2024) solve 6-DoF registration for novel objects without per-instance training:
+1. **Pose Hypothesis Generation**: Renders synthetic neural representations from candidate poses and evaluates structural similarity against observed depth maps.
+2. **Nonlinear Optimization**: Minimizes robust Huber loss over point clouds and neural surface normals:
+
+$$
+\mathbf{T}^* = \arg\min_{\mathbf{T} \in SE(3)} \sum_{k=1}^K \rho_{Huber} \left( \left\| \mathbf{T} \, \mathbf{p}_k^{cad} - \mathbf{p}_k^{obs} \right\|_2 \right)
+$$
+
+---
+
+## 4. Hardware Breakdowns: Active Head Gimbal & Sensor Rig
+
+Humanoid robots maintain active situational awareness by orienting their visual sensors toward human interlocutors and manipulation workspaces:
+
+| System Component | Hardware Specification | Role in Multimodal Perception |
+| :--- | :--- | :--- |
+| **Active Head Gimbal** | 2-DoF Neck Gimbal (Yaw $\pm 90^\circ$, Pitch $-45^\circ \text{ to } +30^\circ$) | Dynamically tracks human gaze and centers candidate objects in optical FOV |
+| **Actuators & Encoders** | Maxon EC-max 22 brushless motors with 19-bit magnetic absolute encoders | Provides sub-milliradian positioning accuracy for head frame transforms |
+| **Stereo Depth Camera** | Intel RealSense D455 (Global shutter, 95° $\times$ 65° FOV) | Captures 1280 $\times$ 720 depth registered with RGB at 30 Hz |
+| **Gaze Tracking Engine** | MediaPipe Iris + FaceMesh running on Jetson Orin PVA | Computes 3D human gaze vector $\hat{\mathbf{g}}$ at 60 Hz to resolve ambiguities |
+
+---
+
+## 5. Conversational Disambiguation Loops
+
+When two objects have nearly identical pointing scores ($\vert S(\mathbf{o}_1) - S(\mathbf{o}_2) \vert < \tau_{ambig}$), the robot must not guess arbitrarily. It initiates an active conversational disambiguation dialogue:
 
 ```mermaid
-flowchart LR
-    Shoulder["Shoulder Joint p_s = (x_s, y_s, z_s)"] --> Vector["Direction Vector d_p"]
-    Fingertip["Index Fingertip p_f = (x_f, y_f, z_f)"] --> Vector
-    Vector --> Ray["Ray Equation: r(t) = p_f + t * d_p"]
-    Ray --> Cone["Cone Angle theta_cone (10 deg)"]
-    Cone --> CandidateObjects["Candidate Object Centroids C_i"]
+flowchart TD
+    Scoring["Conical Scoring Evaluated"] --> CheckDiff{"|S(o_1) - S(o_2)| < tau?"}
+    CheckDiff -->|No: Clear Winner| DirectGrasp["Execute Grasp on o^*"]
+    CheckDiff -->|Yes: Ambiguous| VerbalPrompt["Synthesize Dialogue:<br/>'Did you mean the large red wrench or the small black wrench?'"]
+    VerbalPrompt --> AwaitClarification["Stream Operator Clarification Voice Chunk"]
+    AwaitClarification --> ReScore["Re-weight with disambiguating adjective:<br/>w_sem(color='red') = 1.0"]
+    ReScore --> DirectGrasp
 ```
-
-### The Ray Equation
-Let `p_shoulder in R^3` and `p_fingertip in R^3` represent the detected 3D joint locations in the robot's base frame. The normalized pointing direction vector `d_hat` is:
-
-```text
-d_hat = (p_fingertip - p_shoulder) / ||p_fingertip - p_shoulder||
-```
-
-A semi-infinite 3D ray parameterized by distance `t >= 0` is defined as:
-
-```text
-r(t) = p_fingertip + t * d_hat,  t >= 0
-```
-
-### Cone Intersection & Scoring
-Because human pointing is imprecise (exhibiting an average angular deviation of 5 to 12 degrees), each candidate object centroid `o_i in R^3` in the scene point cloud is evaluated using angular deviation `theta_i` and orthogonal distance `d_i^perp`:
-
-```text
-theta_i = arccos( (o_i - p_fingertip) . d_hat / ||o_i - p_fingertip|| )
-d_i^perp = || (o_i - p_fingertip) - ((o_i - p_fingertip) . d_hat) * d_hat ||
-```
-
-The candidate score `S(o_i)` combines angular alignment with semantic relevance predicted by the language model:
-
-```text
-S(o_i) = w_angle * exp( - theta_i^2 / (2 * sigma_theta^2) ) + w_sem * P_VLM(class_i == 'cup')
-```
-
-The candidate object with the highest score `S(o_i) > S_threshold` is selected as the grounded referent.
 
 ---
 
-## 3. Zero-Shot 6-DoF Pose Tracking with FoundationPose
+## 6. Seminal Research Citations
 
-Once an object candidate is identified by semantic category and pointing intersection, the robot requires its precise **6-DoF SE(3) pose** `(R, T)` to guide its end-effector fingers.
+1. **Chen, B., Xu, Z., Kirmani, S., Ichter, B., Dai, F., & Song, S. (2024).** *SpatialVLM: Endowing vision-language models with spatial reasoning capabilities.* IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR).
+2. **Wen, B., Tremblay, J., Blukis, V., Tyree, S., Müller, T., Evans, A., ... & Fox, D. (2024).** *FoundationPose: Unified 6D pose estimation and tracking of novel objects.* IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR).
+3. **Kirillov, A., Mintun, E., Ravi, N., Mao, H., Rolland, C., Gustafson, L., ... & Dollár, P. (2023).** *Segment anything.* IEEE/CVF International Conference on Computer Vision (ICCV).
+4. **Hartley, R., & Zisserman, A. (2003).** *Multiple View Geometry in Computer Vision.* Cambridge University Press.
 
-Historically, this required offline 3D CAD models for every household object. With modern foundation models like **NVIDIA FoundationPose**, humanoids perform unified zero-shot pose estimation and tracking for novel, unseen objects:
+---
+
+## 7. Complete Runnable Implementation: 3D Deictic Affordance Scorer
+
+The following self-contained Python script performs camera unprojection, 3D pointing ray geometry, and multi-candidate object scoring with simulated spatial keypoints:
 
 ```python
+"""
+3D Deictic Gesture Affordance Scorer.
+Projects camera frames to 3D metric coordinates, casts human pointing rays,
+and scores target objects using conical Gaussian likelihoods.
+"""
+
+from dataclasses import dataclass
+import math
+from typing import List, Tuple
 import numpy as np
 
-class ZeroShotPoseEstimator:
+
+@dataclass
+class CandidateObject:
+    object_id: str
+    semantic_label: str
+    centroid_3d: np.ndarray  # [X, Y, Z] in meters relative to robot base
+    vlm_confidence: float   # P(target | image, label)
+
+
+class DeicticAffordanceResolver:
     """
-    Interfaces with NVIDIA FoundationPose to track novel objects
-    identified via language and gesture without pre-scanned CAD models.
+    Resolves ambiguous deictic spatial references using 3D ray-casting
+    and conical Gaussian affordance scoring.
     """
-    def __init__(self, camera_intrinsics):
-        self.K = camera_intrinsics
-        self.is_tracking = False
-        self.target_object_id = None
 
-    def initialize_object_from_mask(self, rgb_image: np.ndarray, depth_image: np.ndarray, object_mask: np.ndarray):
-        """
-        Uses Segment Anything (SAM) 2D mask + Depth to initialize 6-DoF pose.
-        Returns: 4x4 Transformation Matrix T_cam_object in SE(3)
-        """
-        # FoundationPose model registers reference point cloud
-        # and outputs initial transformation matrix
-        initial_pose = np.eye(4)
-        initial_pose[:3, 3] = [0.12, -0.05, 0.85]  # Target center in camera frame
-        self.is_tracking = True
-        return initial_pose
+    def __init__(
+        self,
+        w_ang: float = 0.45,
+        w_dist: float = 0.35,
+        w_sem: float = 0.20,
+        sigma_theta_rad: float = math.radians(10.0),
+        sigma_dist_m: float = 0.15,
+    ) -> None:
+        self.w_ang = w_ang
+        self.w_dist = w_dist
+        self.w_sem = w_sem
+        self.sigma_theta = sigma_theta_rad
+        self.sigma_dist = sigma_dist_m
 
-    def track_frame(self, rgb_image: np.ndarray, depth_image: np.ndarray):
+    def compute_pointing_ray(
+        self, shoulder_3d: np.ndarray, fingertip_3d: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Real-time 60 Hz pose tracking using GPU-accelerated optical flow
-        and point cloud registration.
+        Computes the origin and normalized direction vector of human pointing ray.
         """
-        if not self.is_tracking:
-            raise RuntimeError("Tracker not initialized.")
-        
-        # Emits current updated SE(3) pose matrix
-        updated_pose = np.eye(4)
-        return updated_pose
+        delta = fingertip_3d - shoulder_3d
+        norm = np.linalg.norm(delta)
+        if norm < 1e-4:
+            raise ValueError("Fingertip and shoulder keypoints are coincident.")
+        unit_direction = delta / norm
+        return fingertip_3d, unit_direction
+
+    def score_candidate(
+        self,
+        ray_origin: np.ndarray,
+        ray_dir: np.ndarray,
+        candidate: CandidateObject,
+    ) -> Tuple[float, float, float]:
+        """
+        Calculates angular deviation, perpendicular distance, and overall score.
+        """
+        to_object = candidate.centroid_3d - ray_origin
+        dist_to_obj = np.linalg.norm(to_object)
+
+        if dist_to_obj < 1e-4:
+            return 0.0, 0.0, 1.0
+
+        # Cosine angle between ray and object vector
+        cos_theta = np.dot(to_object, ray_dir) / dist_to_obj
+        cos_theta = np.clip(cos_theta, -1.0, 1.0)
+        theta_rad = math.acos(cos_theta)
+
+        # Perpendicular distance to ray
+        proj_length = np.dot(to_object, ray_dir)
+        proj_point = ray_origin + proj_length * ray_dir
+        perp_dist = np.linalg.norm(candidate.centroid_3d - proj_point)
+
+        # Conical Gaussian likelihood components
+        angle_likelihood = math.exp(-(theta_rad ** 2) / (2 * (self.sigma_theta ** 2)))
+        dist_likelihood = math.exp(-(perp_dist ** 2) / (2 * (self.sigma_dist ** 2)))
+
+        total_score = (
+            self.w_ang * angle_likelihood
+            + self.w_dist * dist_likelihood
+            + self.w_sem * candidate.vlm_confidence
+        )
+        return theta_rad, perp_dist, total_score
+
+    def resolve_target(
+        self,
+        shoulder_3d: np.ndarray,
+        fingertip_3d: np.ndarray,
+        candidates: List[CandidateObject],
+    ) -> Tuple[CandidateObject, float]:
+        """Identifies best grounded object from candidate set."""
+        ray_origin, ray_dir = self.compute_pointing_ray(shoulder_3d, fingertip_3d)
+
+        best_candidate = None
+        highest_score = -1.0
+
+        print("\n--- Evaluating Candidate Objects Under Pointing Ray ---")
+        for cand in candidates:
+            theta, perp_d, score = self.score_candidate(ray_origin, ray_dir, cand)
+            print(
+                f"  Object: {cand.object_id:<12} ({cand.semantic_label}) | "
+                f"Angle: {math.degrees(theta):5.1f} deg | "
+                f"Perp Dist: {perp_d:5.2f} m | Score: {score:.4f}"
+            )
+            if score > highest_score:
+                highest_score = score
+                best_candidate = cand
+
+        return best_candidate, highest_score
+
+
+def main():
+    """Unit test and demonstration."""
+    resolver = DeicticAffordanceResolver()
+
+    # Human standing near robot: shoulder at [0.8, -0.4, 1.4], pointing to table
+    shoulder = np.array([0.8, -0.4, 1.4])
+    fingertip = np.array([0.5, -0.2, 1.1])  # Ray points toward tabletop
+
+    # Tabletop candidate objects in robot base frame
+    candidates = [
+        CandidateObject("obj_01", "red_mug", np.array([0.3, -0.05, 0.85]), vlm_confidence=0.92),
+        CandidateObject("obj_02", "blue_pen", np.array([0.3, +0.35, 0.85]), vlm_confidence=0.40),
+        CandidateObject("obj_03", "sponge", np.array([0.6, -0.30, 0.85]), vlm_confidence=0.85),
+    ]
+
+    best_target, score = resolver.resolve_target(shoulder, fingertip, candidates)
+    print(f"\n[GROUNDING RESULT] Selected: {best_target.object_id} ({best_target.semantic_label}) with Score: {score:.4f}")
+    assert best_target.object_id == "obj_01", "Expected red_mug to have highest pointing score"
+
+
+if __name__ == "__main__":
+    main()
 ```
-
----
-
-## 4. Conversational Disambiguation Protocol
-
-When the human points toward a crowded countertop containing three different cups, candidate scores are nearly identical (`S(o_1) ~ S(o_2) ~ S(o_3)`), forcing the robot to initiate an active clarification dialogue:
-
-```mermaid
-sequenceDiagram
-    autonumber
-    actor User as Human Operator
-    participant Robot as Humanoid Autonomy Stack
-    participant VLM as Vision-Language Model
-    participant TTS as Speech Synthesizer
-
-    User->>Robot: "Hand me that bottle" (Points to table with 2 bottles)
-    Robot->>Robot: Ray casting yields: Bottle_A (olive oil) and Bottle_B (water)
-    Robot->>VLM: Generate disambiguating visual question
-    VLM-->>Robot: "Do you want the clear water bottle or the green olive oil bottle?"
-    Robot->>TTS: Speak question through head speakers
-    TTS-->>User: "Do you want the clear water bottle or the green olive oil bottle?"
-    User->>Robot: "The water bottle, please."
-    Robot->>Robot: Isolate Bottle_A, track 6-DoF pose, and execute grasp.
-```
-
-By maintaining stateful conversational memory within the cognitive layer, the robot eliminates dangerous misinterpretations.
-
----
-
-## 5. Industrial Application: Human-Robot Handover
-
-Human-to-robot handover is the ultimate benchmark of multimodal fluidity. It requires synchronizing:
-1. **Gaze Tracking**: The humanoid's head tracks the human's eyes to signal social attention.
-2. **Wrist Force-Torque Sensing**: Detecting the precise moment the human releases their grip (`F_drop > 1.2 N`) to clamp the robot's fingers without yanking the human's arm.
-3. **Impedance Compliance**: Operating arm actuators in soft floating mode to prevent joint damage during physical contact.
-
----
-
-## 6. FoundationPose: Zero-Shot 6D Object Pose Estimation
-
-For precision humanoid grasping, 2D bounding boxes are insufficient. The robot must predict the full spatial pose `T in SE(3)` (3D translation `p in R^3` and 3D rotation `R in SO(3)`).
-
-**FoundationPose** (Wen et al., NVIDIA, 2024) achieves state-of-the-art zero-shot 6D object pose tracking without per-object CAD model training:
-1. **Pose Initialization**: Uses a Large Reconstruction Model (LRM) to estimate initial 6D pose from a single RGB-D image and 2D segmentation mask.
-2. **Pose Refinement**: Iteratively minimizes the chamfer distance between the measured depth point cloud and the rendered object hypothesis:
-   ```text
-   L_{chamfer}(T) = sum_{p in P_{depth}} min_{q in T * Q_{mesh}} ||p - q||^2 + sum_{q in T * Q_{mesh}} min_{p in P_{depth}} ||q - p||^2
-   ```
-3. **Real-Time Tracking**: Runs at **60 Hz on Jetson AGX Orin**, providing low-latency visual servoing feedback to the arm controller.
 
 ---
 
 ## Summary
 
-Multimodal interaction is the bridge that transforms a humanoid from an isolated machine into an intuitive collaborator. By unifying **3D pointing ray geometry**, **zero-shot 6-DoF FoundationPose tracking**, and **stateful conversational disambiguation**, humanoid robots can comprehend natural, ambiguous human commands with industrial-grade precision.
+- Resolving ambiguous human deictic gestures requires strict mathematical projection between camera coordinates, 3D metric space, and robot kinematic base frames.
+- 3D pointing rays cast from the human shoulder through the index fingertip define conical Gaussian likelihood fields that evaluate candidate object proximity.
+- Zero-shot 6-DoF pose estimation (FoundationPose) eliminates object-specific retraining, providing exact SE(3) transforms for robot grasp execution.
+- Active head gaze stabilization centers ambiguous objects in the optical frustum, enabling conversational clarification when candidate scores are within uncertainty margins.
+
+---
+
+<ChapterProgress chapterId="4-4-multimodal-interaction" moduleId="module4" totalChapters={10} />
+
+---
+
+<QuizEngine
+  quizId="quiz-4-4"
+  title="Module 4.4 Mastery Check: Multimodal Interaction & Gestures"
+  moduleId="module4"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Given a depth camera with focal lengths (f_x, f_y), principal point (c_x, c_y), and registered depth Z, what is the metric X coordinate in the optical camera frame?",
+      options: [
+        "X = (u - c_x) * Z / f_x",
+        "X = (u + c_x) * f_x / Z",
+        "X = u * f_x * Z",
+        "X = (u - c_x) / (Z * f_x)"
+      ],
+      correctIndex: 0,
+      explanation: "From pinhole camera geometry, u = f_x * (X / Z) + c_x. Solving for X yields X = (u - c_x) * Z / f_x."
+    },
+    {
+      id: "q2",
+      question: "In 3D deictic ray casting, why is a conical Gaussian likelihood preferred over a simple line-intersection threshold?",
+      options: [
+        "Line intersection fails because rays in 3D almost never intersect mathematical point centroids exactly, and human pointing has inherent angular dispersion (approx 5-10 degrees)",
+        "Conical likelihoods eliminate the need for depth cameras",
+        "Gaussian curves run faster on GPUs than vector dot products",
+        "Robots cannot compute 3D cross products"
+      ],
+      correctIndex: 0,
+      explanation: "In continuous 3D space, an infinite ray almost never passes exactly through a point centroid (measure zero). Conical Gaussian models capture human pointing uncertainty by penalizing angular deviation and perpendicular distance smoothly."
+    },
+    {
+      id: "q3",
+      question: "When two candidate objects have pointing scores within an ambiguity threshold |S(o_1) - S(o_2)| < tau, what is the safest control response?",
+      options: [
+        "Execute emergency hardware power shutoff",
+        "Grasp whichever object is closer to the robot's base",
+        "Initiate an active verbal disambiguation prompt asking the user to specify distinct attributes (e.g. color or size)",
+        "Ignore the user command and return to home pose"
+      ],
+      correctIndex: 2,
+      explanation: "Arbitrary guessing risks picking the wrong object or colliding with an unintended target. Initiating conversational disambiguation resolves physical ambiguity safely and transparently."
+    }
+  ]}
+/>
