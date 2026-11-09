@@ -137,3 +137,52 @@ class TestRetrieveChunks:
         assert chunks[0].chunk_id == "0"
         assert chunks[1].chunk_id == "1"
         assert chunks[2].chunk_id == "2"
+
+    def test_retrieve_chunks_with_module_filter_builds_qdrant_filter(self, retriever_service):
+        retriever_service.embedding_generator.generate_embeddings.return_value = [[0.1] * 1024]
+        retriever_service.qdrant_client.query_points.return_value = []
+
+        retriever_service.retrieve_chunks("What is ZMP?", module_filter="module6-bipedal-locomotion")
+
+        call_kwargs = retriever_service.qdrant_client.query_points.call_args.kwargs
+        q_filter = call_kwargs.get("query_filter")
+        assert q_filter is not None
+        assert len(q_filter.must) == 1
+        condition = q_filter.must[0]
+        assert condition.key == "module"
+        assert condition.match.value == "module6"
+
+    def test_retrieve_chunks_with_none_or_all_filter_passes_none(self, retriever_service):
+        retriever_service.embedding_generator.generate_embeddings.return_value = [[0.1] * 1024]
+        retriever_service.qdrant_client.query_points.return_value = []
+
+        # Test None
+        retriever_service.retrieve_chunks("What is ROS 2?", module_filter=None)
+        assert retriever_service.qdrant_client.query_points.call_args.kwargs.get("query_filter") is None
+
+        # Test "all"
+        retriever_service.retrieve_chunks("What is ROS 2?", module_filter="all")
+        assert retriever_service.qdrant_client.query_points.call_args.kwargs.get("query_filter") is None
+
+    def test_retrieve_chunks_populates_payload_metadata(self, retriever_service):
+        retriever_service.embedding_generator.generate_embeddings.return_value = [[0.1] * 1024]
+
+        hit = MagicMock()
+        hit.id = "chunk-xyz"
+        hit.score = 0.96
+        hit.payload = {
+            "source_url": "/ai-book/module1-ros2/1-1-intro",
+            "text": "Intro to ROS 2",
+            "module": "module1",
+            "chapter": "1-1-intro",
+            "content_hash": "hash_abc_123",
+        }
+        retriever_service.qdrant_client.query_points.return_value = [hit]
+
+        chunks = retriever_service.retrieve_chunks("ROS 2")
+        assert len(chunks) == 1
+        assert chunks[0].chunk_id == "chunk-xyz"
+        assert chunks[0].module == "module1"
+        assert chunks[0].chapter == "1-1-intro"
+        assert chunks[0].content_hash == "hash_abc_123"
+
