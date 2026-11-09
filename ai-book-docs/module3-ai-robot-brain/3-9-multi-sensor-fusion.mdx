@@ -1,0 +1,457 @@
+---
+sidebar_position: 9
+title: "Probabilistic Sensor Fusion & State Estimation"
+description: "Mathematical derivation of Kalman, Extended Kalman, and Unscented Kalman Filters, factor graph SLAM, LiDAR-Camera-IMU fusion (LIO-SAM), and robot_localization configuration."
+---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
+
+# Probabilistic Sensor Fusion & State Estimation
+
+A humanoid robot is an inherently underactuated, floating-base dynamical system. While joint motor encoders provide accurate relative kinematics between limbs, they cannot measure the robot's absolute 6-DOF pose in world coordinates. Relying exclusively on any single sensor modality is hazardous:
+- **Cameras** experience optical blur during aggressive head sway and fail in dark or featureless corridors.
+- **LiDARs** suffer from geometric degeneracy in long, featureless hallways and tunnel-like environments.
+- **Inertial Measurement Units (IMUs)** suffer from unbounded double-integration quadratic drift.
+- **Leg Kinematics (Dead Reckoning)** degrade when foot sole slip or viscoelastic ground compliance occurs.
+
+**Probabilistic Multi-Sensor Fusion** provides a mathematically principled framework to unify complementary, asynchronously sampled sensor streams into a globally consistent state estimate. This chapter derives the **Kalman Filter family (KF, EKF, UKF)**, examines **Factor Graph Smoothing (iSAM2)**, details **tightly coupled LiDAR-Inertial-Visual Odometry (LIVO)**, and configures the ROS 2 **`robot_localization`** dual-EKF architecture.
+
+```mermaid
+flowchart TD
+    subgraph MultiModalSensors["Asynchronous Sensor Infrastructure"]
+        IMU_Pelvis["Pelvis IMU (1 kHz: a, omega)"]
+        Encoders["28-DOF Motor Encoders & Contact FSM (1 kHz: q, dq, s)"]
+        LiDAR3D["Livox Mid-360 LiDAR (10 Hz Point Cloud: 200k pts/s)"]
+        cuVSLAM_Odom["Stereo cuVSLAM Pose (60 Hz: Visual Odometry)"]
+        GPS_RTK["Optional RTK-GPS / UWB Anchor Network (5 Hz Global Pose)"]
+    end
+
+    subgraph FusionArchitecture["Dual-EKF Cascaded Fusion Hierarchy (robot_localization)"]
+        subgraph LocalEKF["Local Odometry Filter: EKF Local (Continuous, Zero Jumps)"]
+            IMU_Pelvis --> LocalEKF
+            Encoders --> LocalEKF
+            cuVSLAM_Odom --> LocalEKF
+            LocalEKF --> HighRateOdom["High-Rate Continuous Base Odometry: odom -> base_link (100 Hz)"]
+        end
+
+        subgraph GlobalEKF["Global Map Filter: EKF Global (Absorbs Relocalizations & GPS)"]
+            HighRateOdom --> GlobalEKF
+            LiDAR3D --> GlobalEKF
+            GPS_RTK --> GlobalEKF
+            GlobalEKF --> DriftFreeMap["Global Map Transform: map -> odom (10 Hz)"]
+        end
+    end
+
+    HighRateOdom --> LocomotionControl["1 kHz QP Whole-Body Controller (Locomotion & Balance)"]
+    DriftFreeMap --> GlobalNav["Nav2 Autonomous Global Path Planning"]
+```
+
+---
+
+## 1. Mathematical Derivations: The Kalman Filter Family
+
+Let the robot state at discrete timestep $k$ be represented by $\mathbf{x}_k \in \mathbb{R}^n$ with process dynamics and sensor measurements governed by:
+
+$$
+\mathbf{x}_k = \mathbf{f}(\mathbf{x}_{k-1}, \mathbf{u}_k) + \mathbf{w}_k, \quad \mathbf{w}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{Q}_k)
+$$
+
+$$
+\mathbf{z}_k = \mathbf{h}(\mathbf{x}_k) + \mathbf{v}_k, \quad \mathbf{v}_k \sim \mathcal{N}(\mathbf{0}, \mathbf{R}_k)
+$$
+
+where $\mathbf{Q}_k$ is process noise covariance and $\mathbf{R}_k$ is measurement noise covariance.
+
+### 1.1 The Linear Kalman Filter (KF)
+
+When $\mathbf{f}$ and $\mathbf{h}$ are linear operations ($\mathbf{f}(\mathbf{x}) = \mathbf{F}\mathbf{x} + \mathbf{B}\mathbf{u}$, $\mathbf{h}(\mathbf{x}) = \mathbf{H}\mathbf{x}$), the optimal minimum mean-squared error estimator is given by:
+
+1. **Time Update (Predict)**:
+   $$
+   \hat{\mathbf{x}}_{k|k-1} = \mathbf{F}_k \hat{\mathbf{x}}_{k-1|k-1} + \mathbf{B}_k \mathbf{u}_k
+   $$
+   $$
+   \mathbf{P}_{k|k-1} = \mathbf{F}_k \mathbf{P}_{k-1|k-1} \mathbf{F}_k^T + \mathbf{Q}_k
+   $$
+2. **Measurement Update (Correct)**:
+   $$
+   \mathbf{S}_k = \mathbf{H}_k \mathbf{P}_{k|k-1} \mathbf{H}_k^T + \mathbf{R}_k \quad (\text{Innovation Covariance})
+   $$
+   $$
+   \mathbf{K}_k = \mathbf{P}_{k|k-1} \mathbf{H}_k^T \mathbf{S}_k^{-1} \quad (\text{Optimal Kalman Gain})
+   $$
+   $$
+   \hat{\mathbf{x}}_{k|k} = \hat{\mathbf{x}}_{k|k-1} + \mathbf{K}_k (\mathbf{z}_k - \mathbf{H}_k \hat{\mathbf{x}}_{k|k-1})
+   $$
+   $$
+   \mathbf{P}_{k|k} = (\mathbf{I} - \mathbf{K}_k \mathbf{H}_k) \mathbf{P}_{k|k-1}
+   $$
+
+### 1.2 The Extended Kalman Filter (EKF)
+
+For nonlinear systems, the EKF linearizes dynamics around the current state estimate via first-order Taylor expansion:
+
+$$
+\mathbf{F}_k = \left. \frac{\partial \mathbf{f}}{\partial \mathbf{x}} \right|_{\hat{\mathbf{x}}_{k-1|k-1}}, \quad \mathbf{H}_k = \left. \frac{\partial \mathbf{h}}{\partial \mathbf{x}} \right|_{\hat{\mathbf{x}}_{k|k-1}}
+$$
+
+While computationally lightweight, the EKF diverges when transformations are highly nonlinear (such as rotation group manifolds $SO(3)$ subject to large angular uncertainty) because first-order linearization introduces truncation bias.
+
+### 1.3 The Unscented Kalman Filter (UKF)
+
+The **Unscented Kalman Filter** (Julier & Uhlmann, 2004) avoids Jacobian differentiation by propagating a deterministic set of $2n + 1$ **sigma points** through the true nonlinear functions.
+
+Given state dimension $n$, mean $\bar{\mathbf{x}}$, and covariance $\mathbf{P}$, the sigma points $\boldsymbol{\chi}_i$ are generated via matrix square root (Cholesky decomposition):
+
+$$
+\boldsymbol{\chi}_0 = \bar{\mathbf{x}}
+$$
+
+$$
+\boldsymbol{\chi}_i = \bar{\mathbf{x}} + \left( \sqrt{(n + \lambda)\mathbf{P}} \right)_i, \quad i = 1, \dots, n
+$$
+
+$$
+\boldsymbol{\chi}_{i+n} = \bar{\mathbf{x}} - \left( \sqrt{(n + \lambda)\mathbf{P}} \right)_i, \quad i = 1, \dots, n
+$$
+
+where scaling parameter $\lambda = \alpha^2 (n + \kappa) - n$. The corresponding mean and covariance weights are:
+
+$$
+W_0^{(m)} = \frac{\lambda}{n + \lambda}, \quad W_0^{(c)} = \frac{\lambda}{n + \lambda} + (1 - \alpha^2 + \beta)
+$$
+
+$$
+W_i^{(m)} = W_i^{(c)} = \frac{1}{2(n + \lambda)}, \quad i = 1, \dots, 2n
+$$
+
+Each sigma point is propagated through the nonlinear transition: $\boldsymbol{\gamma}_i = \mathbf{f}(\boldsymbol{\chi}_i, \mathbf{u}_k)$. The predicted mean and covariance are reconstructed via weighted sums:
+
+$$
+\hat{\mathbf{x}}_{k|k-1} = \sum_{i=0}^{2n} W_i^{(m)} \boldsymbol{\gamma}_i, \quad \mathbf{P}_{k|k-1} = \sum_{i=0}^{2n} W_i^{(c)} (\boldsymbol{\gamma}_i - \hat{\mathbf{x}}_{k|k-1})(\boldsymbol{\gamma}_i - \hat{\mathbf{x}}_{k|k-1})^T + \mathbf{Q}_k
+$$
+
+The Unscented Transform achieves 3rd-order Taylor accuracy for Gaussian inputs, providing accurate covariance tracking without calculating analytical Jacobians.
+
+---
+
+## 2. Filtering vs. Smoothing: Factor Graph SLAM
+
+Classical filters (EKF/UKF) maintain only the most recent state $\mathbf{x}_k$, marginalizing past states immediately. This incurs two fundamental drawbacks:
+1. **Irreversible Linearization**: Errors introduced at step $k-50$ cannot be corrected when a loop closure is discovered at step $k$.
+2. **Dense Fill-In**: Marginalizing intermediate landmark states creates dense covariance matrices, increasing computational cost.
+
+**Factor Graph Smoothing** (Kaess et al., 2008) retains the history of states over a sliding window $\mathcal{X} = \{\mathbf{x}_1, \dots, \mathbf{x}_N\}$ and solves a sparse nonlinear least-squares problem:
+
+$$
+\mathcal{X}^* = \arg\min_{\mathcal{X}} \left[ \sum_{i} \|\mathbf{r}_{\text{prior}}(\mathbf{x}_i)\|_{\boldsymbol{\Sigma}_i}^2 + \sum_{k} \|\mathbf{r}_{\text{odom}}(\mathbf{x}_k, \mathbf{x}_{k+1})\|_{\boldsymbol{\Lambda}_k}^2 + \sum_{j} \|\mathbf{r}_{\text{meas}}(\mathbf{x}_j, \mathbf{z}_j)\|_{\boldsymbol{\Omega}_j}^2 \right]
+$$
+
+Using **iSAM2 (Incremental Smoothing and Mapping)** with the Bayes tree data structure, only variables affected by new measurements are re-linearized, achieving real-time performance on mobile hardware.
+
+---
+
+## 3. Consistency Verification: Normalized Innovation Squared (NIS)
+
+To prevent filter divergence, the fusion engine must continuously monitor whether sensory measurements match predicted error covariances using the **Normalized Innovation Squared (NIS)** test:
+
+$$
+\epsilon_{k} = \mathbf{y}_k^T \mathbf{S}_k^{-1} \mathbf{y}_k \quad (\mathbf{y}_k = \mathbf{z}_k - \hat{\mathbf{z}}_k)
+$$
+
+Under consistent Gaussian assumptions, $\epsilon_k$ follows a chi-squared distribution with $m$ degrees of freedom (where $m = \dim(\mathbf{z})$):
+
+$$
+\epsilon_k \sim \chi_m^2
+$$
+
+If $\epsilon_k > \chi_{m, 0.95}^2$, the measurement is flagged as an outlier (e.g., LiDAR beam passing through glass or camera seeing dynamic reflections) and rejected before it can corrupt the filter state.
+
+---
+
+## 4. Production Dual-EKF Configuration: `robot_localization`
+
+Industrial humanoid deployments utilize the ROS 2 `robot_localization` package structured into a two-tier cascaded architecture:
+
+### 1. `ekf_local.yaml` (Continuous Odometry Filter)
+Fuses high-rate proprioceptive sources: pelvis IMU ($1 \text{ kHz}$), leg odometry ($100 \text{ Hz}$), and cuVSLAM ($60 \text{ Hz}$). The output transform (`odom -> base_link`) is guaranteed to be **strictly continuous with zero sudden jumps**, protecting low-level 1 kHz bipedal whole-body controllers.
+
+```yaml
+ekf_filter_node_local:
+  ros__parameters:
+    frequency: 100.0
+    two_d_mode: false
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: odom
+
+    # Sensor 1: Pelvis IMU (ICM-42688-P)
+    imu0: /humanoid/sensors/imu/pelvis/data
+    imu0_config: [false, false, false,   # x, y, z position
+                  true,  true,  true,    # roll, pitch, yaw
+                  false, false, false,   # vx, vy, vz
+                  true,  true,  true,    # roll_rate, pitch_rate, yaw_rate
+                  true,  true,  true]    # ax, ay, az
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 20
+
+    # Sensor 2: cuVSLAM Visual Odometry
+    odom0: /visual_slam/tracking/odometry
+    odom0_config: [true,  true,  true,   # x, y, z position
+                   true,  true,  true,   # roll, pitch, yaw
+                   true,  true,  true,   # vx, vy, vz
+                   false, false, false,  # angular rates
+                   false, false, false]  # linear accelerations
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 10
+```
+
+### 2. `ekf_global.yaml` (Global Map Filter)
+Fuses local odometry with absolute global references (e.g., LiDAR-Inertial LIO-SAM relocalization, AprilTag floor anchors, or RTK-GPS). The output transform (`map -> odom`) absorbs discrete drift corrections, maintaining global alignment without causing step discontinuities in the robot base controller.
+
+```yaml
+ekf_filter_node_global:
+  ros__parameters:
+    frequency: 20.0
+    two_d_mode: false
+    publish_tf: true
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    world_frame: map
+
+    # Input 1: Local Odometry output
+    odom0: /odometry/filtered
+    odom0_config: [true,  true,  true,
+                   true,  true,  true,
+                   true,  true,  true,
+                   true,  true,  true,
+                   false, false, false]
+    odom0_differential: false
+
+    # Input 2: Global LiDAR Relocalization / LIO-SAM
+    pose0: /lio_sam/mapping/pose
+    pose0_config: [true,  true,  true,
+                   true,  true,  true,
+                   false, false, false,
+                   false, false, false,
+                   false, false, false]
+    pose0_differential: false
+```
+
+---
+
+## 5. Complete Python Consistency Verification & NIS Testing Harness
+
+Below is a complete, production-grade Python script simulating a multi-sensor fusion pipeline, executing EKF state updates, and validating filter consistency using the chi-squared NIS test:
+
+```python
+"""
+sensor_fusion_nis_verifier.py
+Simulates an Extended Kalman Filter fusing IMU and visual odometry,
+and verifies mathematical covariance consistency using Normalized Innovation Squared (NIS).
+"""
+
+from typing import Tuple, List
+import numpy as np
+from scipy.stats import chi2
+
+
+class HumanoidStateEstimatorEKF:
+    """
+    6-DOF EKF fusing linear accelerations, angular rates, and position measurements.
+    State vector: [p_x, p_y, p_z, v_x, v_y, v_z] (6x1)
+    """
+
+    def __init__(self, dt: float = 0.01):
+        self.dt = dt
+        self.dim_x = 6
+        self.x = np.zeros((6, 1))  # State: [x, y, z, vx, vy, vz]
+        self.P = np.eye(6) * 0.1   # Initial state covariance
+
+        # State transition matrix F
+        self.F = np.eye(6)
+        self.F[0, 3] = dt
+        self.F[1, 4] = dt
+        self.F[2, 5] = dt
+
+        # Process noise covariance Q
+        q_pos = 0.001
+        q_vel = 0.02
+        self.Q = np.diag([q_pos, q_pos, q_pos, q_vel, q_vel, q_vel])
+
+        # Measurement model H (observing positions [x, y, z] from cuVSLAM)
+        self.H = np.zeros((3, 6))
+        self.H[0, 0] = 1.0
+        self.H[1, 1] = 1.0
+        self.H[2, 2] = 1.0
+
+        # Measurement noise covariance R
+        self.R = np.eye(3) * (0.02 ** 2)
+
+    def predict(self, accel_input: np.ndarray):
+        """
+        Predict step with control input u = accel (3x1):
+        p += v * dt + 0.5 * a * dt^2,  v += a * dt
+        """
+        B = np.zeros((6, 3))
+        B[0:3, :] = np.eye(3) * 0.5 * (self.dt ** 2)
+        B[3:6, :] = np.eye(3) * self.dt
+
+        self.x = self.F @ self.x + B @ accel_input
+        self.P = self.F @ self.P @ self.F.T + self.Q
+
+    def update(self, z: np.ndarray) -> Tuple[float, bool]:
+        """
+        Measurement update step. Returns (nis_value, is_consistent).
+        """
+        z_pred = self.H @ self.x
+        y = z - z_pred  # Innovation
+
+        S = self.H @ self.P @ self.H.T + self.R  # Innovation covariance
+        S_inv = np.linalg.inv(S)
+
+        K = self.P @ self.H.T @ S_inv  # Kalman Gain
+
+        self.x = self.x + K @ y
+        self.P = (np.eye(self.dim_x) - K @ self.H) @ self.P
+
+        # Calculate Normalized Innovation Squared (NIS): y^T * S^-1 * y
+        nis = float((y.T @ S_inv @ y).item())
+
+        # Chi-squared test for 3 degrees of freedom at 95% confidence (threshold = 7.815)
+        chi2_threshold = chi2.ppf(0.95, df=3)
+        is_consistent = nis <= chi2_threshold
+
+        return nis, is_consistent
+
+
+if __name__ == "__main__":
+    print("=" * 65)
+    print("Multi-Sensor Fusion Consistency & NIS Verification")
+    print("=" * 65)
+
+    estimator = HumanoidStateEstimatorEKF(dt=0.01)
+    nis_history: List[float] = []
+
+    # Simulate 100 timesteps of forward bipedal motion
+    true_pos = np.zeros(3)
+    true_vel = np.array([0.6, 0.0, 0.0])
+
+    outlier_count = 0
+    total_steps = 100
+
+    for step in range(total_steps):
+        true_pos += true_vel * 0.01
+        accel_meas = np.array([[0.0], [0.0], [0.0]])  # Constant velocity
+
+        estimator.predict(accel_meas)
+
+        # Simulate cuVSLAM position reading with Gaussian noise
+        noise = np.random.normal(0, 0.02, 3)
+        # Inject one artificial sensor glitch outlier at step 50
+        if step == 50:
+            noise += np.array([0.5, 0.0, 0.0])  # 50 cm visual tracking jump
+
+        z_meas = (true_pos + noise).reshape(3, 1)
+
+        nis, is_valid = estimator.update(z_meas)
+        nis_history.append(nis)
+        if not is_valid:
+            outlier_count += 1
+
+    chi2_upper = chi2.ppf(0.95, df=3)
+    avg_nis = np.mean(nis_history)
+
+    print(f"Total Steps Evaluated:          {total_steps}")
+    print(f"Degrees of Freedom (Measurement): 3")
+    print(f"Chi-Squared 95% Confidence Limit: {chi2_upper:.3f}")
+    print(f"Empirical Average NIS:           {avg_nis:.3f} (Expected near 3.0)")
+    print(f"Outliers Detected via Gate:      {outlier_count} / {total_steps}")
+
+    if avg_nis < chi2_upper:
+        print("[PASS] Filter covariance is statistically consistent with measurements.")
+    else:
+        print("[FAIL] Filter is overconfident or diverging.")
+    print("=" * 65)
+```
+
+---
+
+## 6. Summary & Seminal Literature
+
+Multi-sensor fusion enables bipedal humanoid autonomy by combining complementary proprioceptive and exteroceptive sensors. By contrasting linear KFs, nonlinear EKFs, and derivative-free UKFs, and structuring edge computation into a dual-EKF architecture with chi-squared innovation consistency monitoring, roboticists achieve continuous, jump-free state feedback for real-time walking stabilization.
+
+### Seminal Research Citations
+1. **Julier, S. J., & Uhlmann, J. K. (2004).** *Unscented filtering and nonlinear estimation*. Proceedings of the IEEE, 92(3), 401–422.
+2. **Kaess, M., Ranganathan, A., & Dellaert, F. (2008).** *iSAM: Incremental smoothing and mapping*. IEEE Transactions on Robotics, 24(6), 1365–1378.
+3. **Shan, T., Englot, B., Meyers, D., Wang, W., Ratti, C., & Rus, D. (2020).** *LIO-SAM: Tightly-coupled lidar inertial odometry via smoothing and mapping*. IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS).
+4. **Moore, T., & Stouch, D. (2016).** *A generalized extended Kalman filter implementation for the Robot Operating System*. Conference on Field and Service Robotics (FSR).
+
+---
+
+<ChapterProgress chapterId="3-9-multi-sensor-fusion" moduleId="module3" totalChapters={10} />
+
+## Chapter Mastery Check
+
+<QuizEngine
+  quizId="quiz-3-9"
+  title="Module 3.9 Mastery Check: Multi-Sensor Fusion"
+  moduleId="module3"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why does the Unscented Kalman Filter (UKF) outperform the Extended Kalman Filter (EKF) when fusing sensor orientations on SO(3) manifolds?",
+      options: [
+        "The UKF executes fewer clock cycles than a simple linear filter",
+        "The UKF propagates deterministic sigma points through the true nonlinear kinematic equations, capturing higher-order Taylor moments without truncation errors or analytical Jacobian calculations",
+        "The UKF does not require a measurement noise covariance matrix R",
+        "The UKF operates strictly on integers"
+      ],
+      correctIndex: 1,
+      explanation: "EKF uses first-order Taylor expansion, which introduces significant linearization errors under large rotational uncertainties. The UKF uses the Unscented Transform to capture mean and covariance with 3rd-order accuracy for Gaussian distributions."
+    },
+    {
+      id: "q2",
+      question: "In the ROS 2 robot_localization dual-EKF architecture, why is the local odometry filter (ekf_local) isolated from absolute global sensors like GPS or global map relocalizers?",
+      options: [
+        "To save CPU memory",
+        "To guarantee that the odom -> base_link transform remains strictly continuous and jump-free, preventing discrete position steps that would destabilize 1 kHz bipedal whole-body controllers",
+        "Because ekf_local only supports 2D mobile robots",
+        "To allow the robot to operate without an IMU"
+      ],
+      correctIndex: 1,
+      explanation: "Global map relocalizations introduce discrete coordinate jumps when loop closures occur. If fed into the local odometry frame, these discontinuous position jumps would cause high-gain whole-body controllers to command destructive motor torque spikes."
+    },
+    {
+      id: "q3",
+      question: "What is the primary role of the Normalized Innovation Squared (NIS) consistency test in an operational humanoid state estimator?",
+      options: [
+        "To calibrate the focal length of the camera lens",
+        "To verify whether sensor residuals match predicted covariance bounds (y^T * S^-1 * y ~ chi^2), enabling the system to detect and reject outlier measurements before they corrupt the state",
+        "To compute inverse kinematics for the swing foot",
+        "To measure the battery discharge rate"
+      ],
+      correctIndex: 1,
+      explanation: "NIS checks innovation magnitude against the predicted innovation covariance S. If the NIS value exceeds the chi-squared distribution threshold, the measurement is rejected as a statistical outlier."
+    },
+    {
+      id: "q4",
+      question: "How does Factor Graph Smoothing (e.g., iSAM2) differ fundamentally from traditional filtering approaches (EKF/UKF)?",
+      options: [
+        "Smoothing completely ignores sensor noise",
+        "Smoothing retains a sliding window or full history of past states and re-linearizes affected variables when new loop closures or delayed measurements arrive, whereas filtering marginalizes past states immediately",
+        "Filtering requires multiple GPUs while smoothing runs on a microcontroller",
+        "Smoothing only works with 2D planar LiDARs"
+      ],
+      correctIndex: 1,
+      explanation: "Filtering discards past history after updating the current state. Smoothing maintains past pose nodes in a factor graph, allowing past errors to be retroactively resolved when new constraints or loop closures are discovered."
+    }
+  ]}
+/>
