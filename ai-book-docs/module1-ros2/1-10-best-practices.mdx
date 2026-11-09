@@ -1,7 +1,11 @@
 ---
 sidebar_position: 10
-title: Best Practices, Safety Watchdogs & Diagnostics
+title: "Best Practices, Safety Watchdogs & Diagnostics"
+description: "Production architectural guidelines, SROS2 security and PKI authentication, rosbag2 MCAP logging, and watchdog safety patterns."
 ---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
 
 # Best Practices, Safety Watchdogs & Diagnostics
 
@@ -26,7 +30,54 @@ flowchart TD
 
 ---
 
-## 1. Naming & Topic Namespace Hierarchy
+## 1. Safety Engineering: Diagnostic Coverage (DC) & Standards
+
+Industrial humanoid safety systems align with **ISO 13849-1** (Safety of machinery — Safety-related parts of control systems) and **IEC 61508** (Functional Safety).
+
+### Diagnostic Coverage Formulation (ISO 13849-1)
+
+To achieve **Performance Level e (PL e)** or **Safety Integrity Level 3 (SIL 3)**, the ratio of dangerous failures detected by diagnostics relative to total dangerous failure rates must satisfy:
+
+$$
+\text{DC} = \frac{\sum \lambda_{\text{detected\_dangerous}}}{\sum \lambda_{\text{total\_dangerous}}} \times 100\% \ge 99\% \quad (\text{High Diagnostic Coverage})
+$$
+
+Software watchdogs and hardware interlocks continuously cross-check physical sensor outputs against dynamic forward kinematic models to detect sensor drift, motor encoder slippage, or communication bus corruption.
+
+---
+
+## 2. SROS2: DDS Security & Public Key Infrastructure (PKI)
+
+By default, DDS transmits unauthenticated, unencrypted packets across the network. On a physical humanoid, this allows any device on the network to inject false joint torque commands.
+
+**SROS2 (Secure ROS 2)** integrates the OMG DDS Security specification across three distinct pluggable plugins:
+1. **Authentication**: Uses X.509 digital certificates and Elliptic Curve Cryptography (ECDSA P-256) to verify node identities during participant discovery.
+2. **Access Control**: Validates signed permission documents defining allowed publish and subscribe topics per enclave.
+3. **Cryptographic Protection**: Applies AES-GCM (128-bit or 256-bit) to encrypt payload contents and authenticate message integrity.
+
+### ECDSA P-256 Cryptographic Verification Latency Bound
+
+Node discovery authentication latency is dominated by elliptic curve scalar point multiplication $M_{\text{scalar\_mult}}$:
+
+$$
+T_{\text{verify}} = 2 \cdot M_{\text{scalar\_mult}} + \mathcal{O}(1) \approx 0.45\text{--}1.2\text{ ms on ARM Cortex-A78AE}
+$$
+
+Because authentication occurs exclusively during initial node discovery (PDP handshake), SROS2 does not inject cryptographic latency into steady-state 1 kHz control loops.
+
+---
+
+## 3. Physical Security & Safety Hardware Breakdown
+
+| Security / Safety Hardware | Interface | Function in Autonomous Humanoid | Real-Time Impact |
+| :--- | :--- | :--- | :--- |
+| **TPM 2.0 (SLB9670 / ST33)** | SPI Bus (43 MHz) | Hardware root-of-trust; stores private keys for SROS2 DDS enclaves | Handshake delay occurs strictly during discovery boot phase |
+| **Pilz PNOZ Safety Relay** | Dual-Channel N/C Contacts | Monitors physical E-Stop buttons; cuts gate drive power to inverters | Hardware trip time &lt; 15 ms; completely independent of OS |
+| **Industrial SSD (pSLC)** | NVMe PCIe Gen 4 | High-write endurance rosbag2 flight recorder logging raw sensor streams | Zero write stalls via asynchronous ring buffer offloading |
+
+---
+
+## 4. Naming & Topic Namespace Hierarchy
 
 On a robot with hundreds of active communication topics, ad-hoc topic names like `/cmd_vel` or `/image` cause naming collisions and broken launch orchestrations. Professional humanoid stacks enforce strict hierarchical namespaces:
 
@@ -57,149 +108,107 @@ On a robot with hundreds of active communication topics, ad-hoc topic names like
 
 ---
 
-## 2. Diagnostics Aggregation Pipeline
+## 5. Automated SROS2 Keystore & Governance Deployment Script
 
-The standard ROS 2 diagnostics pipeline utilizes `diagnostic_updater` inside every node to stream component health metrics to a centralized `/diagnostics` topic. A dedicated `diagnostic_aggregator` node groups these reports into logical subsystems:
+Below is a production Bash script generating an automated SROS2 PKI keystore, creating permission profiles, and enforcing topic access control:
 
-```mermaid
-graph LR
-    MotorNode1["Left Knee Actuator"] -->|DiagnosticStatus: OK, Temp=42°C| Aggregator["diagnostic_aggregator"]
-    MotorNode2["Right Knee Actuator"] -->|DiagnosticStatus: WARN, Temp=68°C| Aggregator
-    IMUNode["Pelvis IMU"] -->|DiagnosticStatus: OK, 1000 Hz| Aggregator
-    Aggregator -->|Aggregated Health Report| Monitor["rqt_robot_monitor / Telemetry Dashboard"]
+```bash
+#!/usr/bin/env bash
+# sros2_humanoid_pki_bringup.sh: Automated SROS2 security governance generator
+set -euo pipefail
+
+KEYSTORE_DIR="/etc/sros2/humanoid_keystore"
+ENCLAVE_NAME="/humanoid/realtime_controller"
+
+echo "=== Initializing Humanoid SROS2 PKI Architecture ==="
+rm -rf "${KEYSTORE_DIR}"
+ros2 security create_keystore "${KEYSTORE_DIR}"
+
+echo "=== Creating Secure Enclave for Real-Time Locomotion Node ==="
+ros2 security create_enclave "${KEYSTORE_DIR}" "${ENCLAVE_NAME}"
+
+cat << 'EOF' > "${KEYSTORE_DIR}/enclaves${ENCLAVE_NAME}/policy.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<policy version="0.2.0">
+  <enclave path="/humanoid/realtime_controller">
+    <profiles>
+      <profile ns="/sensors" node="*">
+        <topic publish="ALLOW">
+          <expression>/sensors/imu/pelvis</expression>
+        </topic>
+        <topic subscribe="ALLOW">
+          <expression>/humanoid/joint_commands</expression>
+        </topic>
+      </profile>
+    </profiles>
+  </enclave>
+</policy>
+EOF
+
+echo "=== Signing Security Governance Artifacts ==="
+ros2 security create_permission "${KEYSTORE_DIR}" "${ENCLAVE_NAME}" "${KEYSTORE_DIR}/enclaves${ENCLAVE_NAME}/policy.xml"
+
+echo "SROS2 Security Configuration Complete. Launch nodes with: "
+echo "export ROS_SECURITY_ENABLE=true"
+echo "export ROS_SECURITY_STRATEGY=Enforce"
+echo "export ROS_SECURITY_KEYSTORE=${KEYSTORE_DIR}"
 ```
 
 ---
 
-## 3. Production C++20 Safety Watchdog Node
+## 6. Research Foundations & Seminal Standards
 
-The following production node implements a real-time hardware watchdog that monitors the heartbeat of the primary locomotion controller. If a control packet is delayed by more than **10 milliseconds**, it instantly dispatches a hardware emergency stop:
+1. **White, R., Caiazza, G., & Christensen, H. I. (2019).** *SROS2: Usable Cyber Security Tools for Mechanism Design in Robotics*. In IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) (pp. 5312-5319).
+2. **National Institute of Standards and Technology (NIST). (2020).** *Recommendation for Key Management: Part 1 – General*. NIST Special Publication 800-57 Part 1 Revision 5.
+3. **International Organization for Standardization. (2015).** *ISO 13849-1: Safety of machinery — Safety-related parts of control systems — Part 1: General principles for design*. ISO Standard.
 
-```cpp
-#include <chrono>
-#include <memory>
-#include "diagnostic_msgs/msg/diagnostic_array.hpp"
-#include "rclcpp/rclcpp.hpp"
-#include "std_msgs/msg/bool.hpp"
-#include "std_msgs/msg/header.hpp"
+---
 
-using namespace std::chrono_literals;
+<ChapterProgress chapterId="1-10-best-practices" moduleId="module1" totalChapters={14} />
 
-class HumanoidSafetyWatchdog : public rclcpp::Node {
-public:
-  HumanoidSafetyWatchdog() : Node("humanoid_safety_watchdog") {
-    // 1. Configure publishers and subscribers
-    estop_pub_ = create_publisher<std_msgs::msg::Bool>("/humanoid/safety/emergency_stop", 10);
-    diag_pub_ = create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics", 10);
+## Chapter Mastery Check
 
-    heartbeat_sub_ = create_subscription<std_msgs::msg::Header>(
-      "/humanoid/control/heartbeat",
-      rclcpp::QoS(1).best_effort(),
-      std::bind(&HumanoidSafetyWatchdog::heartbeat_callback, this, std::placeholders::_1));
-
-    // 2. High-frequency watchdog timer running at 500 Hz (every 2 ms)
-    watchdog_timer_ = create_wall_timer(
-      2ms, std::bind(&HumanoidSafetyWatchdog::watchdog_check, this));
-
-    last_heartbeat_time_ = now();
-    estop_triggered_ = false;
-
-    RCLCPP_INFO(get_logger(), "Humanoid Safety Watchdog online. Timeout threshold: 10 ms.");
-  }
-
-private:
-  void heartbeat_callback(const std_msgs::msg::Header::SharedPtr msg) {
-    (void)msg;
-    last_heartbeat_time_ = now();
-  }
-
-  void watchdog_check() {
-    auto time_since_last_heartbeat = now() - last_heartbeat_time_;
-
-    // If locomotion thread freezes or misses deadlines for > 10 ms
-    if (time_since_last_heartbeat > rclcpp::Duration(10ms) && !estop_triggered_) {
-      estop_triggered_ = true;
-      RCLCPP_FATAL(
-        get_logger(),
-        "WATCHDOG TRIGGERED! Locomotion heartbeat lost for %.2f ms. Engaging E-Stop!",
-        time_since_last_heartbeat.seconds() * 1000.0);
-
-      // Immediately publish E-Stop to trigger mechanical brakes and zero motor currents
-      std_msgs::msg::Bool estop_msg;
-      estop_msg.data = true;
-      estop_pub_->publish(estop_msg);
-
-      publish_diagnostic(diagnostic_msgs::msg::DiagnosticStatus::ERROR, "Locomotion controller freeze");
+<QuizEngine
+  quizId="quiz-1-10"
+  title="Module 1.10 Mastery Check: Best Practices, Safety Watchdogs & Diagnostics"
+  moduleId="module1"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "In ISO 13849-1 functional safety, what diagnostic coverage (DC) percentage is required to certify high diagnostic coverage for SIL 3 / PL e humanoid systems?",
+      options: [
+        "DC >= 60%",
+        "DC >= 90%",
+        "DC >= 99%",
+        "DC = 100% with zero tolerance"
+      ],
+      correctIndex: 2,
+      explanation: "ISO 13849-1 defines Diagnostic Coverage (DC) >= 99% as the threshold for 'High' diagnostic coverage, necessary for achieving Safety Integrity Level 3 (SIL 3) and Performance Level e (PL e)."
+    },
+    {
+      id: "q2",
+      question: "Why does SROS2 encryption (AES-GCM) avoid introducing runtime latency into steady-state 1 kHz joint torque loops?",
+      options: [
+        "ECDSA P-256 authentication occurs once during initial participant discovery (PDP handshake); steady-state payload encryption can be selectively disabled on isolated internal buses",
+        "It uses quantum computing algorithms that run in zero time",
+        "Linux kernels automatically disable security when timers run at 1 kHz",
+        "SROS2 only runs when the robot is plugged into AC power"
+      ],
+      correctIndex: 0,
+      explanation: "Cryptographic handshakes and certificate verifications occur during the initial PDP/EDP discovery phase. For internal real-time buses, governance XML policies can enforce authentication during discovery while avoiding payload encryption on isolated shared memory."
+    },
+    {
+      id: "q3",
+      question: "Why should an autonomous humanoid employ a hardware Pilz safety relay in addition to software watchdogs?",
+      options: [
+        "Software watchdogs cannot run in Linux",
+        "A physical safety relay operates independently of the CPU, OS, and memory; if the kernel panics or the software deadlocks, the hardware relay guarantees physical contactor de-energization",
+        "Pilz relays generate torque commands for joints",
+        "Hardware relays are required by Python 3"
+      ],
+      correctIndex: 1,
+      explanation: "Software watchdogs can fail if the operating system experiences a hard lockup, kernel panic, or power rail brownout. A physical safety relay provides galvanic isolation and guaranteed tripping independent of software state."
     }
-  }
-
-  void publish_diagnostic(uint8_t level, const std::string & message) {
-    diagnostic_msgs::msg::DiagnosticArray diag_array;
-    diag_array.header.stamp = now();
-
-    diagnostic_msgs::msg::DiagnosticStatus status;
-    status.name = "Humanoid Safety Watchdog";
-    status.hardware_id = "core_watchdog";
-    status.level = level;
-    status.message = message;
-
-    diag_array.status.push_back(status);
-    diag_pub_->publish(diag_array);
-  }
-
-  rclcpp::Time last_heartbeat_time_;
-  bool estop_triggered_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estop_pub_;
-  rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_pub_;
-  rclcpp::Subscription<std_msgs::msg::Header>::SharedPtr heartbeat_sub_;
-  rclcpp::TimerBase::SharedPtr watchdog_timer_;
-};
-
-int main(int argc, char * argv[]) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<HumanoidSafetyWatchdog>());
-  rclcpp::shutdown();
-  return 0;
-}
-```
-
----
-
-## 4. SROS2 Security Architecture: PKI & Access Control
-
-Deploying high-torque humanoid robots in human-centric spaces requires cryptographic security against rogue packet injection:
-
-```mermaid
-graph TD
-    CA["Robotic Root Certificate Authority (CA)"]
-    
-    subgraph SROS2Enclave["SROS2 Security Enclave (DDS-Security v1.1)"]
-        Auth["1. Authentication (X.509 PKI Certificates)"]
-        Access["2. Access Control (Signed XML Governance & Permissions)"]
-        Crypto["3. Cryptographic Encryption (AES-GCM-256 Wire Encryption)"]
-    end
-
-    CA --> Auth
-    Auth --> Access
-    Access --> Crypto
-    Crypto --> SafeBus["Protected DDS Control Bus"]
-```
-
-1. **Authentication**: Every ROS 2 node must present an X.509 certificate signed by the robot root authority before participating in the RTPS discovery graph.
-2. **Access Control**: Fine-grained permissions restrict which nodes can publish to `/cmd_vel` or invoke `/safety/estop`.
-3. **Payload Encryption**: Hard real-time sensor streams use hardware-accelerated AES-GCM-256 encryption on Jetson ARM Cryptography Extensions.
-
----
-
-## 5. Module 1 Summary & Engineering Checklist
-
-You have now established the complete, deterministic nervous system for an autonomous humanoid robot:
-- [x] **Decentralized DDS RTPS** configured without single points of failure.
-- [x] **Managed Lifecycle State Machines** preventing unsafe premature actuator power.
-- [x] **Zero-Copy Shared Memory IPC** enabling gigabyte-per-second sensor pipelines at sub-microsecond latencies.
-- [x] **Reentrant Concurrency** eliminating deadlock risks in service calls.
-- [x] **Preemptible Actions** providing graceful recovery during locomotion failures.
-- [x] **Dynamic Parameter Descriptors** enforcing strict physical stability envelopes.
-- [x] **Hard Real-Time Watchdogs** ensuring automated protection against controller freezes.
-
-With the nervous system operational, we advance to **Module 2: Constructing the High-Fidelity Physics Digital Twin in Gazebo Harmonic & Unity**.
+  ]}
+/>

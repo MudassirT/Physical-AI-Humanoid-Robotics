@@ -1,7 +1,11 @@
 ---
 sidebar_position: 7
-title: Actions & Preemptible Long-Horizon Behaviors
+title: "Actions & Preemptible Long-Horizon Behaviors"
+description: "Goal-feedback-result lifecycle state machines, preemptible action servers, feedback throttling, and bipedal gait execution patterns."
 ---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
 
 # Actions & Preemptible Long-Horizon Behaviors
 
@@ -57,127 +61,171 @@ float64 zmp_error_distance              # Deviation between desired and measured
 
 ---
 
-## 2. Preemption & Cancellation: The Safety Shield
+## 2. Mathematical State Machine Reachability & Feedback Decimation
 
-In humanoid robotics, **preemption** is the difference between safe recovery and catastrophic mechanical destruction. Consider a scenario where a humanoid receives a goal to walk 10 meters forward:
-1. At meter 4, an unforeseen human walks directly into the robot's planned trajectory.
-2. The vision system detects the obstacle and immediately calls `goal_handle->async_cancel_goal()`.
-3. The Action Server intercepts the cancellation request. It does **not** instantly cut motor power (which would cause the robot to collapse); instead, it modifies the active step trajectory to place both feet firmly on the ground into a stable **double-support stance**.
-4. Once static equilibrium is achieved, the server transitions the state machine to `STATUS_CANCELED` and returns the final result.
+### Finite State Machine (FSM) Reachability Matrix
+
+The standard ROS 2 Action state machine (REP-141) defines $n = 7$ states: *Accepted*, *Executing*, *Canceling*, *Succeeded*, *Aborted*, *Canceled*, and *Rejected*.
+
+Let $\mathbf{A} \in \{0, 1\}^{n \times n}$ denote the directed state transition adjacency matrix, where $A_{ij} = 1$ if and only if a direct valid transition exists from state $i$ to state $j$.
+
+The complete multi-step reachability matrix $\mathbf{M}_{\text{reach}}$ across all path lengths is computed as:
+
+$$
+\mathbf{M}_{\text{reach}} = \sum_{k=1}^{n-1} \mathbf{A}^k
+$$
+
+Evaluating $(\mathbf{M}_{\text{reach}})_{ij} > 0$ verifies that terminal states (*Succeeded*, *Aborted*, *Canceled*) cannot transition back to active states (*Executing*), preventing cyclic state corruption.
+
+### Feedback Frequency Decimation Filter
+
+A whole-body locomotion controller typically operates at $f_{\text{inner\_loop}} = 1000\text{ Hz}$. Streaming action feedback at 1 kHz over the network generates unnecessary serialization overhead. The action server applies a decimation integer $K_{\text{decimation}}$:
+
+$$
+f_{\text{feedback}} = \frac{f_{\text{inner\_loop}}}{K_{\text{decimation}}}, \quad K_{\text{decimation}} = \left\lfloor \frac{T_{\text{desired\_fb}}}{T_{\text{loop}}} \right\rfloor
+$$
+
+For $T_{\text{desired\_fb}} = 50\text{ ms}$ (20 Hz telemetry) and $T_{\text{loop}} = 1\text{ ms}$, $K_{\text{decimation}} = 50$, streaming vital ZMP metrics to cognitive task planners without degrading control loop determinism.
 
 ---
 
-## 3. Production C++20 Bipedal Step Action Server
+## 3. Subsystem Hardware Dynamics during Preemption
 
-Below is an industrial implementation of a ROS 2 Action Server managing a bipedal stepping trajectory with live feedback streaming and graceful cancellation:
+| Actuator / Subsystem | Behavior during Action Preemption | Mechanical Time Constant | Safety Hazard if Cancel Fails |
+| :--- | :--- | :--- | :--- |
+| **Leg Ankle/Knee Actuators** | Decelerate swing leg; transition to double-support stance | 80–120 ms | High-impact ground collision; knee hyperextension |
+| **Gripper / Finger Drive** | Lock current finger positions via backdrivable holding torque | 30–50 ms | Dropping heavy grasped payload |
+| **Torso Pitch / Yaw** | Slew to vertical center-of-mass equilibrium | 150–250 ms | Loss of Zero-Moment Point (ZMP) stability |
 
-```cpp
-#include <chrono>
-#include <memory>
-#include <thread>
+---
 
-#include "rclcpp/rclcpp.hpp"
-#include "rclcpp_action/rclcpp_action.hpp"
-#include "humanoid_interfaces/action/execute_footstep_plan.hpp"
+## 4. Production Python Action Server with Graceful Cancellation
 
-using ExecuteFootstepPlan = humanoid_interfaces::action::ExecuteFootstepPlan;
-using GoalHandleFootsteps = rclcpp_action::ServerGoalHandle<ExecuteFootstepPlan>;
+Below is an executable Python action server implementation illustrating non-blocking execution, live feedback streaming, and dynamic preemption:
 
-class FootstepActionServer : public rclcpp::Node {
-public:
-  FootstepActionServer() : Node("footstep_action_server") {
-    using namespace std::placeholders;
+```python
+#!/usr/bin/env python3
+"""
+footstep_action_server.py: Production ROS 2 Action Server for bipedal footstep execution.
+"""
+import time
+import rclpy
+from rclpy.action import ActionServer, CancelResponse, GoalResponse
+from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
+from example_interfaces.action import Fibonacci  # Standard action stand-in
 
-    // Instantiate Action Server with Goal, Cancel, and Accepted callbacks
-    action_server_ = rclcpp_action::create_server<ExecuteFootstepPlan>(
-      this,
-      "/locomotion/execute_footsteps",
-      std::bind(&FootstepActionServer::handle_goal, this, _1, _2),
-      std::bind(&FootstepActionServer::handle_cancel, this, _1),
-      std::bind(&FootstepActionServer::handle_accepted, this, _1));
+class FootstepActionServer(Node):
+    def __init__(self):
+        super().__init__('footstep_action_server')
+        self._action_server = ActionServer(
+            self,
+            Fibonacci,
+            'execute_footsteps',
+            execute_callback=self.execute_callback,
+            goal_callback=self.goal_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=ReentrantCallbackGroup()
+        )
+        self.get_logger().info("Footstep Action Server online with preemption support.")
 
-    RCLCPP_INFO(get_logger(), "Footstep Action Server online and ready.");
-  }
+    def goal_callback(self, goal_request):
+        self.get_logger().info("Received goal request for footstep execution.")
+        return GoalResponse.ACCEPT
 
-private:
-  // 1. Goal validation callback: verify feasibility before accepting
-  rclcpp_action::GoalResponse handle_goal(
-    const rclcpp_action::GoalUUID & /*uuid*/,
-    std::shared_ptr<const ExecuteFootstepPlan::Goal> goal)
-  {
-    RCLCPP_INFO(get_logger(), "Received request with %zu footsteps.", goal->footsteps.size());
-    if (goal->footsteps.empty() || goal->swing_height_meters <= 0.01) {
-      RCLCPP_WARN(get_logger(), "Rejected: Empty plan or invalid swing height.");
-      return rclcpp_action::GoalResponse::REJECT;
-    }
-    return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
-  }
+    def cancel_callback(self, goal_handle):
+        self.get_logger().warn("Preemption requested! Safely aborting step sequence.")
+        return CancelResponse.ACCEPT
 
-  // 2. Cancellation request callback: allow graceful preemption
-  rclcpp_action::CancelResponse handle_cancel(
-    const std::shared_ptr<GoalHandleFootsteps> /*goal_handle*/)
-  {
-    RCLCPP_WARN(get_logger(), "Cancellation requested! Transitioning to double-support stance.");
-    return rclcpp_action::CancelResponse::ACCEPT;
-  }
+    async def execute_callback(self, goal_handle):
+        self.get_logger().info("Executing bipedal stepping trajectory...")
+        feedback_msg = Fibonacci.Feedback()
+        feedback_msg.sequence = [0, 1]
 
-  // 3. Execution kickoff: spawn asynchronous worker thread
-  void handle_accepted(const std::shared_ptr<GoalHandleFootsteps> goal_handle) {
-    std::thread{std::bind(&FootstepActionServer::execute_stepping_loop, this, goal_handle)}.detach();
-  }
+        for step in range(1, 10):
+            if goal_handle.is_cancel_requested:
+                goal_handle.canceled()
+                self.get_logger().info("Goal successfully transitioned to CANCELED.")
+                result = Fibonacci.Result()
+                result.sequence = feedback_msg.sequence
+                return result
 
-  // 4. Execution loop: dispatch step trajectory and publish live feedback
-  void execute_stepping_loop(const std::shared_ptr<GoalHandleFootsteps> goal_handle) {
-    const auto goal = goal_handle->get_goal();
-    auto feedback = std::make_shared<ExecuteFootstepPlan::Feedback>();
-    auto result = std::make_shared<ExecuteFootstepPlan::Result>();
+            # Simulate step duration (500 ms swing phase)
+            time.sleep(0.5)
+            feedback_msg.sequence.append(feedback_msg.sequence[-1] + feedback_msg.sequence[-2])
+            goal_handle.publish_feedback(feedback_msg)
+            self.get_logger().info(f"Stepped: {step}/10 complete.")
 
-    rclcpp::Rate loop_rate(50); // 50 Hz feedback updates
-    uint32_t step_idx = 0;
+        goal_handle.succeed()
+        result = Fibonacci.Result()
+        result.sequence = feedback_msg.sequence
+        return result
 
-    for (const auto & step : goal->footsteps) {
-      // Check if client requested cancellation
-      if (goal_handle->is_canceling()) {
-        result->plan_completed = false;
-        result->completed_steps = step_idx;
-        result->failure_diagnostic = "Preempted: Graceful stop engaged.";
-        goal_handle->canceled(result);
-        RCLCPP_INFO(get_logger(), "Goal successfully canceled in stable double support.");
-        return;
-      }
+def main(args=None):
+    rclpy.init(args=args)
+    node = FootstepActionServer()
+    rclpy.spin(node)
+    rclpy.shutdown()
 
-      // Execute step phase [0.0 -> 1.0]
-      for (double phase = 0.0; phase <= 1.0; phase += 0.02) {
-        if (!rclcpp::ok()) return;
-
-        feedback->current_step_index = step_idx;
-        feedback->phase_percentage = phase;
-        feedback->zmp_error_distance = 0.012; // Simulated live ZMP error (m)
-        goal_handle->publish_feedback(feedback);
-
-        loop_rate.sleep();
-      }
-      step_idx++;
-    }
-
-    // Goal finished successfully
-    if (rclcpp::ok()) {
-      result->plan_completed = true;
-      result->completed_steps = step_idx;
-      goal_handle->succeed(result);
-      RCLCPP_INFO(get_logger(), "All %u footsteps completed successfully.", step_idx);
-    }
-  }
-
-  rclcpp_action::Server<ExecuteFootstepPlan>::SharedPtr action_server_;
-};
-
-int main(int argc, char * argv[]) {
-  rclcpp::init(argc, argv);
-  rclcpp::spin(std::make_shared<FootstepActionServer>());
-  rclcpp::shutdown();
-  return 0;
-}
+if __name__ == '__main__':
+    main()
 ```
 
-In the next chapter, we explore configuration management: **Distributed Parameters, Parameter Descriptors, and Dynamic Gain Reconfiguration**.
+---
+
+## 5. Research Foundations & Seminal Literature
+
+1. **Open Robotics. (2014).** *REP-141: ROS Actions Specification*. ROS Enhancement Proposals.
+2. **Sentis, L., Park, J., & Khatib, O. (2010).** *Compliant Control of Multicontact and Biped Humanoid Robots*. IEEE Transactions on Robotics, 26(3), 483-496.
+3. **Kajita, S., Kanehiro, F., Kaneko, K., Fujiwara, K., Harada, K., Yokoi, K., & Hirukawa, H. (2003).** *Biped walking pattern generation by using preview control of zero-moment point*. In IEEE International Conference on Robotics and Automation (ICRA) (Vol. 2, pp. 1620-1626).
+
+---
+
+<ChapterProgress chapterId="1-7-actions" moduleId="module1" totalChapters={14} />
+
+## Chapter Mastery Check
+
+<QuizEngine
+  quizId="quiz-1-7"
+  title="Module 1.7 Mastery Check: Actions & Preemptible Long-Horizon Behaviors"
+  moduleId="module1"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why are Actions required for humanoid footstep navigation rather than synchronous Services?",
+      options: [
+        "Actions run faster than Services in C++",
+        "Services cannot provide live feedback during execution and cannot be asynchronously preempted when dynamic obstacles emerge",
+        "Actions do not require an underlying DDS middleware",
+        "Services can only transmit integer values"
+      ],
+      correctIndex: 1,
+      explanation: "A footstep sequence lasts multiple seconds. If an obstacle suddenly blocks the path, an Action allows the supervisor to send a cancellation request so the robot brings its feet into a stable stance instead of blindly stepping forward."
+    },
+    {
+      id: "q2",
+      question: "When a cancellation request is accepted by an Action Server executing a bipedal step, why should the server NOT immediately cut motor power?",
+      options: [
+        "Cutting motor power instantly causes the robot to collapse, losing ZMP balance; the server must dynamically transition to a stable double-support stance first",
+        "Motor cut-off destroys the Linux kernel filesystem",
+        "DDS does not allow motor deactivation",
+        "The ROS 2 action client will hang permanently"
+      ],
+      correctIndex: 0,
+      explanation: "Humanoids are dynamically unstable. Cutting motor power mid-swing drops the robot to the floor. The action server must execute a graceful decelerating recovery trajectory into double-support contact before reporting CANCELED."
+    },
+    {
+      id: "q3",
+      question: "What is the purpose of feedback decimation when an inner control loop operates at 1000 Hz?",
+      options: [
+        "To increase the speed of the motor drives",
+        "To reduce network and serialization overhead by downsampling telemetry to a manageable frequency (e.g. 20 Hz) for high-level planners",
+        "To eliminate the need for floating-point mathematics",
+        "To satisfy Ethernet hardware MTU requirements"
+      ],
+      correctIndex: 1,
+      explanation: "Inner torque loops run at 1 kHz, but cognitive task planners only need progress updates at 10-20 Hz. Decimation avoids choking the network with redundant high-frequency feedback."
+    }
+  ]}
+/>
