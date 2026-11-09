@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.logging import get_logger
-from app.routes import chat
+from app.routes import analytics, chat
 
 logger = get_logger(__name__)
 
@@ -43,6 +43,7 @@ app.add_middleware(
 )
 
 app.include_router(chat.router)
+app.include_router(analytics.router)
 
 
 @app.get("/heartbeat", summary="Liveness probe")
