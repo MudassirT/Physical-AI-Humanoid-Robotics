@@ -3,13 +3,14 @@ Agent Service — RAG Agent built on Google Gemini with function calling.
 
 The agent operates in a tool-calling loop (max 5 turns):
 1. Send user query → LLM decides whether to call ``retrieve_chunks``.
-2. Execute the tool against the Qdrant vector DB.
+2. Execute the tool against the Qdrant vector DB (with optional module filtering).
 3. Feed tool output back → LLM synthesises a grounded answer.
 4. Return final text response with source citations.
 
-The system prompt explicitly instructs the model to answer *only* from
-retrieved content and to admit when information is unavailable.
+Also provides ``ask_agent_stream`` for Server-Sent Events (SSE) streaming.
 """
+
+from typing import Generator, Optional
 
 import google.genai as genai
 from google.genai import types
@@ -109,12 +110,17 @@ class AgentService:
     # Private helpers
     # ------------------------------------------------------------------
 
-    def _call_tool(self, function_call: types.FunctionCall) -> ToolOutput:
+    def _call_tool(
+        self,
+        function_call: types.FunctionCall,
+        module_filter: Optional[str] = None,
+    ) -> ToolOutput:
         """
         Dispatches a tool call received from the LLM and returns its output.
 
         Args:
             function_call: A Gemini ``FunctionCall`` object from the response.
+            module_filter: Optional curriculum module filter.
 
         Returns:
             A :class:`ToolOutput` with the tool name and string result.
@@ -133,10 +139,13 @@ class AgentService:
                 )
 
             logger.info(
-                f"AgentService: calling retrieve_chunks — query='{query_text}', top_k={top_k}"
+                f"AgentService: calling retrieve_chunks — query='{query_text}', "
+                f"top_k={top_k}, module_filter={module_filter}"
             )
             chunks = self.retriever_service.retrieve_chunks(
-                query_text=query_text, top_k=top_k
+                query_text=query_text,
+                top_k=top_k,
+                module_filter=module_filter,
             )
 
             if not chunks:
@@ -162,7 +171,11 @@ class AgentService:
     # Public API
     # ------------------------------------------------------------------
 
-    def ask_agent(self, user_query: str) -> ChatResponse:
+    def ask_agent(
+        self,
+        user_query: str,
+        module_filter: Optional[str] = None,
+    ) -> ChatResponse:
         """
         Runs the RAG agent loop for a single user query.
 
@@ -173,11 +186,12 @@ class AgentService:
 
         Args:
             user_query: The user's natural-language question.
+            module_filter: Optional module filter for targeted retrieval.
 
         Returns:
             A :class:`ChatResponse` with ``answer_text`` and ``retrieved_sources``.
         """
-        logger.info(f"AgentService.ask_agent — query: '{user_query}'")
+        logger.info(f"AgentService.ask_agent — query: '{user_query}', module_filter: {module_filter}")
 
         # Build the initial conversation history
         contents: list[types.Content] = [
@@ -206,16 +220,14 @@ class AgentService:
                         function_calls.append(part.function_call)
 
             if function_calls:
-                # Append the model's tool-call turn to history by reusing the
-                # candidate Content directly — this avoids re-constructing
-                # types.Part objects from proto objects and is safer.
+                # Append the model's tool-call turn to history
                 model_content = response.candidates[0].content
                 contents.append(model_content)
 
                 # Execute each tool and collect results
                 tool_result_parts: list[types.Part] = []
                 for fc in function_calls:
-                    tool_output = self._call_tool(fc)
+                    tool_output = self._call_tool(fc, module_filter=module_filter)
 
                     # Collect unique source URLs
                     if (
@@ -248,7 +260,6 @@ class AgentService:
             try:
                 answer_text = response.text.strip() if response.text else ""
             except Exception:
-                # response.text may raise if there are no text parts
                 for candidate in response.candidates or []:
                     for part in candidate.content.parts or []:
                         if part.text:
@@ -283,6 +294,116 @@ class AgentService:
             answer_text="I could not generate a response after multiple attempts. Please try again.",
             retrieved_sources=[],
         )
+
+    def ask_agent_stream(
+        self,
+        user_query: str,
+        module_filter: Optional[str] = None,
+    ) -> Generator[tuple[str, dict], None, None]:
+        """
+        Runs the RAG agent in streaming mode for Server-Sent Events (SSE).
+
+        Yields tuples of ``(event_type, event_data)``:
+        1. ``("sources", {"sources": [...]})`` — Retrieved source URLs.
+        2. ``("token", {"token": "..."})`` — Streamed token chunks.
+        3. ``("done", {"done": True, "total_sources": N})`` — Completion signal.
+        4. ``("error", {"error": "..."})`` — On failure.
+
+        Args:
+            user_query: The user's question.
+            module_filter: Optional curriculum module filter.
+        """
+        logger.info(
+            f"AgentService.ask_agent_stream — query: '{user_query}', "
+            f"module_filter: {module_filter}"
+        )
+        try:
+            # 1. Retrieve chunks with optional module filtering
+            chunks = self.retriever_service.retrieve_chunks(
+                query_text=user_query,
+                top_k=5,
+                module_filter=module_filter,
+            )
+
+            # Deduplicate sources preserving order
+            seen_sources: set[str] = set()
+            sources: list[str] = []
+            for chunk in chunks:
+                if (
+                    chunk.source_url
+                    and chunk.source_url != "unknown"
+                    and chunk.source_url not in seen_sources
+                ):
+                    seen_sources.add(chunk.source_url)
+                    sources.append(chunk.source_url)
+
+            # Emit sources event immediately
+            yield ("sources", {"sources": sources})
+
+            # If no chunks were found, emit fallback response
+            if not chunks:
+                fallback_msg = "I could not find relevant information in the book to answer that question."
+                yield ("token", {"token": fallback_msg})
+                yield ("done", {"done": True, "total_sources": 0})
+                return
+
+            # 2. Formulate grounded prompt for streaming generation
+            context_text = "\n\n".join(
+                f"Source: {c.source_url}\nContent: {c.original_text}" for c in chunks
+            )
+            grounded_prompt = (
+                f"{SYSTEM_PROMPT}\n\n"
+                f"Context from the book:\n{context_text}\n\n"
+                f"Question: {user_query}\nAnswer:"
+            )
+
+            # 3. Stream generated tokens
+            stream_fn = getattr(self.gemini_client.models, "generate_content_stream", None)
+            if callable(stream_fn):
+                response_stream = stream_fn(
+                    model=self.model,
+                    contents=grounded_prompt,
+                )
+                for chunk in response_stream:
+                    token_text = ""
+                    if hasattr(chunk, "text") and chunk.text:
+                        token_text = chunk.text
+                    elif hasattr(chunk, "candidates") and chunk.candidates:
+                        for cand in chunk.candidates:
+                            for part in (cand.content.parts if cand.content else []):
+                                if hasattr(part, "text") and part.text:
+                                    token_text += part.text
+                    elif isinstance(chunk, str):
+                        token_text = chunk
+
+                    if token_text:
+                        yield ("token", {"token": token_text})
+            else:
+                # Fallback if streaming is not directly supported on client/mock
+                response = self.gemini_client.models.generate_content(
+                    model=self.model,
+                    contents=grounded_prompt,
+                )
+                answer_text = ""
+                if hasattr(response, "text") and response.text:
+                    answer_text = response.text
+                elif hasattr(response, "candidates") and response.candidates:
+                    for cand in response.candidates:
+                        for part in (cand.content.parts if cand.content else []):
+                            if hasattr(part, "text") and part.text:
+                                answer_text += part.text
+
+                words = answer_text.split(" ")
+                for i, word in enumerate(words):
+                    token = word + (" " if i < len(words) - 1 else "")
+                    yield ("token", {"token": token})
+
+            # 4. Emit completion signal
+            yield ("done", {"done": True, "total_sources": len(sources)})
+
+        except Exception as exc:
+            logger.error(f"AgentService.ask_agent_stream error: {exc}", exc_info=True)
+            yield ("error", {"error": str(exc)})
 
 
 # ---------------------------------------------------------------------------

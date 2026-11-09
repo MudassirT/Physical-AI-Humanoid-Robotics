@@ -1,4 +1,7 @@
+from typing import Optional
+
 from qdrant_client import QdrantClient
+from qdrant_client import models as qmodels
 
 from app.core.config import settings
 from app.core.logging import get_logger
@@ -15,7 +18,8 @@ class RetrieverService:
 
     Given a natural-language query, the service:
     1. Embeds the query with Cohere (``search_query`` input type).
-    2. Performs an approximate-nearest-neighbour search in Qdrant.
+    2. Performs an approximate-nearest-neighbour search in Qdrant, optionally
+       filtered by curriculum module.
     3. Returns the top-k results as ``ContentChunk`` objects.
     """
 
@@ -71,30 +75,58 @@ class RetrieverService:
     # Public API
     # ------------------------------------------------------------------
 
-    def retrieve_chunks(self, query_text: str, top_k: int = 5) -> list[ContentChunk]:
+    def retrieve_chunks(
+        self,
+        query_text: str,
+        top_k: int = 5,
+        module_filter: Optional[str] = None,
+    ) -> list[ContentChunk]:
         """
         Retrieves the most relevant content chunks for a given query from Qdrant.
 
         Args:
             query_text: The natural-language query to search for.
             top_k: Maximum number of chunks to return (default: 5).
+            module_filter: Optional curriculum module identifier (e.g. "module1",
+                "module6-bipedal-locomotion"). If None or "all", performs global search.
 
         Returns:
             A list of :class:`ContentChunk` objects, ordered by descending
             similarity score. Returns an empty list when embedding fails or
             no results are found.
         """
-        logger.info(f"RetrieverService: querying Qdrant for '{query_text[:80]}...' (top_k={top_k})")
+        logger.info(
+            f"RetrieverService: querying Qdrant for '{query_text[:80]}...' "
+            f"(top_k={top_k}, module_filter={module_filter})"
+        )
 
         query_embedding = self._get_query_embedding(query_text)
         if query_embedding is None:
             logger.warning("RetrieverService: embedding generation failed — returning empty result.")
             return []
 
+        query_filter = None
+        if module_filter and module_filter.strip().lower() not in ("", "all", "none"):
+            clean_filter = module_filter.strip()
+            norm_module = clean_filter.split("-")[0] if "-" in clean_filter else clean_filter
+            # Normalize standard curriculum module identifiers to lowercase for Qdrant keyword matching
+            if norm_module.isalnum() or norm_module.replace("_", "").isalnum():
+                norm_module = norm_module.lower()
+                clean_filter = clean_filter.lower()
+            query_filter = qmodels.Filter(
+                must=[
+                    qmodels.FieldCondition(
+                        key="module",
+                        match=qmodels.MatchValue(value=norm_module),
+                    )
+                ]
+            )
+
         try:
             search_result = self.qdrant_client.query_points(
                 collection_name=self.collection_name,
                 query=query_embedding,
+                query_filter=query_filter,
                 limit=top_k,
                 with_payload=True,
             )
@@ -111,6 +143,9 @@ class RetrieverService:
                 source_url=payload.get("source_url", "unknown"),
                 original_text=payload.get("text", "unknown"),
                 score=hit.score,
+                module=payload.get("module"),
+                chapter=payload.get("chapter"),
+                content_hash=payload.get("content_hash"),
             )
             retrieved_chunks.append(chunk)
 
