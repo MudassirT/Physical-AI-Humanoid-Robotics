@@ -1,0 +1,403 @@
+---
+sidebar_position: 4
+title: "Privileged Learning: Asymmetric Actor-Critic & RMA"
+description: "Asymmetric Actor-Critic architectures, Rapid Motor Adaptation (RMA), teacher-student privileged distillation, and DreamWaQ visual distillation."
+---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
+
+# Privileged Learning: Asymmetric Actor-Critic & RMA
+
+In reinforcement learning, the environment simulator is not merely a generator of sample transitions—it is an omniscient digital oracle. Inside simulation, we possess instantaneous, noise-free access to ground-truth physical quantities: the exact friction coefficient $\mu$ under each foot sole, the precise millimeter-level terrain elevation map surrounding the robot, the center of mass displacement caused by a hidden payload, the instantaneous ground reaction force vectors, and motor winding resistance.
+
+On physical humanoid hardware, virtually none of these variables can be measured directly. Equipping a robot with dense arrays of external LiDARs, load cells, and soil sensors adds weight, fragility, and computational latency. **Privileged Learning** resolves this asymmetry through a two-stage paradigm: first, we train an optimal "teacher" policy that leverages privileged simulation data; second, we distill this privileged intelligence into a "student" policy that runs purely on physical onboard proprioception (joint encoders, IMU, and recent action history).
+
+```mermaid
+flowchart TD
+    subgraph Stage1["Stage 1: Privileged Reinforcement Learning (Simulation Only)"]
+        PrivState["Privileged Physical Properties e_t:\n[friction mu, terrain heightmap h, payload mass m_ext, foot forces f_c]"]
+        PropState["Proprioceptive State s_t:\n[joint angles q, velocities q_dot, IMU gyro omega, prev action a_t-1]"]
+
+        PrivEncoder["Environment Factor Encoder mu_e(e_t)"]
+        BasePolicy["Base Control Policy pi(a_t | s_t, z_t)"]
+        PrivCritic["Asymmetric Value Critic V(s_t, e_t)"]
+
+        PrivState --> PrivEncoder -->|Extrinsics Latent z_t| BasePolicy
+        PropState --> BasePolicy
+        PrivState --> PrivCritic
+        PropState --> PrivCritic
+        BasePolicy --> PPOUpdate["PPO Multi-Task Update"]
+        PrivCritic --> PPOUpdate
+    end
+
+    subgraph Stage2["Stage 2: Supervised Temporal Distillation (Frozen Policy)"]
+        HistoryBuffer["Proprioceptive History Window:\n H_t = [s_t-K:t, a_t-K:t-1] (50 timesteps = 1 sec)"]
+        AdaptationModule["Student Adaptation Module (1D Temporal CNN) g_psi(H_t)"]
+        PredLatent["Predicted Latent z_hat_t"]
+        TargetLatent["Ground-Truth Latent z_t (from Stage 1 Encoder)"]
+
+        HistoryBuffer --> AdaptationModule --> PredLatent
+        TargetLatent -.->|Supervised MSE Loss: ||z_hat - z||^2| PredLatent
+    end
+
+    subgraph Deployment["Stage 3: Zero-Shot Physical Hardware Deployment"]
+        RealSensors["Onboard IMU + Joint Encoders"] --> RealHistory["Rolling History Buffer H_t"]
+        RealHistory --> AdaptationModule
+        AdaptationModule -->|Real-Time Latent z_hat_t| BasePolicy
+        RealSensors --> BasePolicy
+        BasePolicy -->|Motor Torques tau| HardwareMotors["Unitree G1 Actuator Drives (500 Hz)"]
+    end
+```
+
+---
+
+## 1. Asymmetric Actor-Critic (AAC)
+
+Standard Actor-Critic algorithms constrain both the policy $\pi_{\boldsymbol{\theta}}(\mathbf{a}_t \mid \mathbf{s}_t)$ and the value critic $V_{\boldsymbol{\phi}}(\mathbf{s}_t)$ to observe the identical state $\mathbf{s}_t$. In sim-to-real transfer, this constraint is unnecessarily restrictive: the value function is discarded after training and is **never executed on the physical robot**.
+
+In **Asymmetric Actor-Critic (AAC)**, the critic is fed the full privileged state $\mathbf{S}_t^{\text{priv}} = (\mathbf{s}_t, \mathbf{e}_t)$, while the actor observes only real-world deployable observations $\mathbf{s}_t$:
+
+$$
+\text{Actor: } \pi_{\boldsymbol{\theta}}(\mathbf{a}_t \mid \mathbf{s}_t), \quad \text{Critic: } V_{\boldsymbol{\phi}}(\mathbf{s}_t, \mathbf{e}_t)
+$$
+
+### The Value Variance Reduction Theorem
+By conditioning the value function on privileged information $\mathbf{e}_t$, the environment appears deterministic rather than partially observable (POMDP $\to$ MDP). The variance of the Generalized Advantage Estimator (GAE) drops substantially:
+
+$$
+\operatorname{Var}\left( \hat{A}_t^{\text{priv}} \right) = \operatorname{Var}\left( \sum_{l=0}^\infty (\gamma \lambda)^l \delta_{t+l}^{\text{priv}} \right) \ll \operatorname{Var}\left( \hat{A}_t^{\text{proprio}} \right)
+$$
+
+where temporal difference error $\delta_t^{\text{priv}} = r_t + \gamma V_{\boldsymbol{\phi}}(\mathbf{s}_{t+1}, \mathbf{e}_{t+1}) - V_{\boldsymbol{\phi}}(\mathbf{s}_t, \mathbf{e}_t)$ exhibits zero variance stemming from hidden physical parameters.
+
+---
+
+## 2. Rapid Motor Adaptation (RMA) Architecture
+
+Introduced by Kumar et al. (2021), **Rapid Motor Adaptation (RMA)** extends privileged learning into a two-stage framework that estimates environmental changes online from proprioception alone.
+
+### Stage 1: Base Policy Training with Environmental Latents
+Let $\mathbf{e}_t \in \mathbb{R}^E$ denote the privileged physics vector (e.g., foot friction $\mu \in \mathbb{R}^2$, payload mass $m \in \mathbb{R}$, center of mass shift $\Delta \mathbf{c} \in \mathbb{R}^3$, joint damping offsets). An environmental factor encoder $\mu_{\mathbf{e}}: \mathbb{R}^E \to \mathbb{R}^Z$ compresses this vector into a compact latent context $\mathbf{z}_t \in \mathbb{R}^8$:
+
+$$
+\mathbf{z}_t = \mu_{\mathbf{e}}(\mathbf{e}_t)
+$$
+
+The base control policy $\pi_{\boldsymbol{\theta}}(\mathbf{a}_t \mid \mathbf{s}_t, \mathbf{z}_t)$ is trained via model-free reinforcement learning (such as PPO) across thousands of parallel randomized environments. Because $\mathbf{z}_t$ informs the policy whether it is on ice or rubber, or carrying a light or heavy load, the policy learns specialized, highly agile dynamic primitives.
+
+### Stage 2: Supervised Temporal Trajectory Distillation
+Once the base policy $\pi_{\boldsymbol{\theta}}$ and encoder $\mu_{\mathbf{e}}$ converge, their weights are frozen. A physical robot cannot evaluate $\mu_{\mathbf{e}}(\mathbf{e}_t)$ because $\mathbf{e}_t$ is unknown. However, the physical interactions of the robot with its environment—such as foot slippage, actuator deceleration under load, and chassis tilt—are implicitly encoded within the **temporal history of proprioceptive states and actions**:
+
+$$
+\mathbf{H}_t = \begin{bmatrix} \mathbf{s}_t & \mathbf{s}_{t-1} & \dots & \mathbf{s}_{t-K+1} \\ \mathbf{a}_{t-1} & \mathbf{a}_{t-2} & \dots & \mathbf{a}_{t-K} \end{bmatrix} \in \mathbb{R}^{K \times (D_s + D_a)}
+$$
+
+We train a student **Adaptation Module** $g_{\boldsymbol{\psi}}(\mathbf{H}_t)$ parameterized by a 1D Temporal Convolutional Network (TCN) to predict the latent context $\hat{\mathbf{z}}_t$:
+
+$$
+\min_{\boldsymbol{\psi}} \mathcal{L}_{\text{distill}}(\boldsymbol{\psi}) = \mathbb{E}_{\tau \sim \pi_{\boldsymbol{\theta}}} \left[ \|\hat{\mathbf{z}}_t - \mathbf{z}_t\|^2 \right] = \mathbb{E}_{\tau} \left[ \left\| g_{\boldsymbol{\psi}}(\mathbf{H}_t) - \mu_{\mathbf{e}}(\mathbf{e}_t) \right\|_2^2 \right]
+$$
+
+Because this is a supervised regression objective over transitions generated in simulation, training converges rapidly (within 10–20 minutes on a modern GPU) without reward engineering or policy divergence.
+
+---
+
+## 3. Visual Distillation: DreamWaQ & Privileged Terrain Elevation
+
+While RMA focuses on dynamic contact parameters, locomotion over rough, unstructured terrain requires exteroceptive geometric awareness. Standard vision pipelines require real-time 3D point cloud registration, surface mesh reconstruction, and ray-casting, which introduce severe latency ($50\text{--}150\text{ ms}$) and sensor dropouts.
+
+**DreamWaQ** (Nahrendra et al., 2023) and **PKD** (Privileged Knowledge Distillation) extend the privileged paradigm to vision:
+1. In simulation, the teacher policy receives an exact digital elevation map (height scan grid $h(x, y)$ of $1.5\text{ m} \times 1.0\text{ m}$ sampled at $5\text{ cm}$ resolution around the robot's base).
+2. The student policy receives a stream of raw, noisy depth images from an onboard RealSense D435 camera or purely proprioceptive terrain impact history.
+3. The distillation loss combines latent feature matching with policy action KL divergence:
+
+$$
+\mathcal{L}_{\text{vis}}(\boldsymbol{\psi}) = \mathbb{E}_{\mathbf{s}_t} \left[ D_{\text{KL}}\left(\pi_{\text{teacher}}(\cdot \mid \mathbf{s}_t, \mathbf{h}_{\text{grid}}) \,\Big\|\, \pi_{\text{student}}(\cdot \mid \mathbf{s}_t, \mathbf{I}_{\text{depth}}; \boldsymbol{\psi})\right) \right] + \lambda \|\mathbf{z}_{\text{student}} - \mathbf{z}_{\text{geom}}\|^2
+$$
+
+---
+
+## 4. Comparison of Privileged Learning Paradigms
+
+| Architecture | Privileged Inputs ($\mathbf{e}_t$) | Student Inputs ($\mathbf{s}_t$) | Distillation Target | Online Compute Overhead | Physical Reaction Latency |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Asymmetric Actor-Critic (AAC)** | Full sim physics, forces, friction | Current proprioception $\mathbf{s}_t$ | None (Critic discarded at runtime) | $0.0\text{ ms}$ (No extra module) | Zero adaptation (Fixed blind policy) |
+| **RMA (Kumar et al.)** | Friction, payload, CoM, damping | 50-step joint & IMU history $\mathbf{H}_t$ | Environmental latent $\mathbf{z}_t \in \mathbb{R}^8$ | $0.8\text{ ms}$ (1D TCN on Jetson) | $20\text{--}40\text{ ms}$ (2–4 gait steps) |
+| **DreamWaQ** | Exact ground heightmap $h(x, y)$ | Proprioceptive history + velocity | 2D body height & foot clearance | $0.5\text{ ms}$ (MLP encoder) | $10\text{--}20\text{ ms}$ |
+| **PKD (Privileged Knowledge)** | Object 6D pose, contact normal | Vision features + tactile skin | Teacher action distribution $q(a)$ | $3.5\text{ ms}$ (Vision transformer) | $30\text{--}60\text{ ms}$ |
+
+---
+
+## 5. Production PyTorch Implementation: Two-Stage RMA Pipeline
+
+Below is a complete, production-grade PyTorch implementation of the RMA architecture, containing the privileged environment encoder, the base policy network, the 1D CNN trajectory history adaptation module, and the supervised distillation trainer:
+
+```python
+#!/usr/bin/env python3
+"""
+rma_privileged_learning.py
+Production-grade PyTorch implementation of Rapid Motor Adaptation (RMA)
+featuring the Privileged Environment Factor Encoder, Base Control Policy,
+and Temporal Convolutional Student Adaptation Module.
+"""
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from typing import Tuple, Dict
+
+
+class PrivilegedEnvironmentEncoder(nn.Module):
+    """
+    Stage 1 Teacher Component:
+    Compresses high-dimensional privileged simulation physics vector e_t
+    into an 8-dimensional environmental latent context z_t.
+    """
+
+    def __init__(self, priv_dim: int = 24, latent_dim: int = 8):
+        super().__init__()
+        self.encoder = nn.Sequential(
+            nn.Linear(priv_dim, 64),
+            nn.ELU(),
+            nn.Linear(64, 32),
+            nn.ELU(),
+            nn.Linear(32, latent_dim),
+        )
+
+    def forward(self, e_t: torch.Tensor) -> torch.Tensor:
+        return self.encoder(e_t)
+
+
+class RMABasePolicy(nn.Module):
+    """
+    Base Control Policy pi(a_t | s_t, z_t):
+    Outputs Gaussian action means for PD motor controllers given the current
+    proprioceptive state s_t and environment latent vector z_t.
+    """
+
+    def __init__(self, proprio_dim: int = 36, latent_dim: int = 8, action_dim: int = 12):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(proprio_dim + latent_dim, 256),
+            nn.ELU(),
+            nn.Linear(256, 128),
+            nn.ELU(),
+            nn.Linear(128, action_dim),
+        )
+        self.log_std = nn.Parameter(torch.zeros(action_dim))
+
+    def forward(self, s_t: torch.Tensor, z_t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        x = torch.cat([s_t, z_t], dim=-1)
+        action_mean = self.net(x)
+        action_std = torch.exp(self.log_std).expand_as(action_mean)
+        return action_mean, action_std
+
+
+class StudentAdaptationModule(nn.Module):
+    """
+    Stage 2 Student Component:
+    1D Temporal Convolutional Network that processes a rolling history window
+    H_t = [s_t-K:t, a_t-K:t-1] to reconstruct the environment latent z_hat_t.
+    """
+
+    def __init__(self, history_len: int = 50, feature_dim: int = 48, latent_dim: int = 8):
+        super().__init__()
+        # Input shape: (Batch, feature_dim, history_len)
+        self.conv_block = nn.Sequential(
+            nn.Conv1d(feature_dim, 32, kernel_size=5, stride=2),  # 50 -> 23
+            nn.ELU(),
+            nn.Conv1d(32, 32, kernel_size=5, stride=2),           # 23 -> 10
+            nn.ELU(),
+            nn.Conv1d(32, 32, kernel_size=3, stride=1),           # 10 -> 8
+            nn.ELU(),
+        )
+        self.fc = nn.Sequential(
+            nn.Linear(32 * 8, 64),
+            nn.ELU(),
+            nn.Linear(64, latent_dim),
+        )
+
+    def forward(self, history: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            history: Tensor of shape (Batch, history_len, feature_dim)
+        Returns:
+            z_hat: Estimated latent of shape (Batch, latent_dim)
+        """
+        # Permute to (Batch, feature_dim, history_len) for Conv1d
+        x = history.transpose(1, 2)
+        feat = self.conv_block(x)
+        feat = feat.flatten(start_dim=1)
+        z_hat = self.fc(feat)
+        return z_hat
+
+
+class RMADistillationTrainer:
+    """Manages Stage 2 supervised distillation training."""
+
+    def __init__(
+        self,
+        student_module: StudentAdaptationModule,
+        priv_encoder: PrivilegedEnvironmentEncoder,
+        lr: float = 1e-3,
+        device: str = "cpu",
+    ):
+        self.device = torch.device(device)
+        self.student = student_module.to(self.device)
+        self.priv_encoder = priv_encoder.to(self.device)
+        # Freeze teacher encoder
+        for p in self.priv_encoder.parameters():
+            p.requires_grad = False
+
+        self.optimizer = torch.optim.Adam(self.student.parameters(), lr=lr)
+
+    def train_step(self, batch_history: torch.Tensor, batch_e_priv: torch.Tensor) -> float:
+        """
+        Executes one gradient descent step on supervised MSE loss ||z_hat - z||^2.
+        """
+        self.student.train()
+        batch_history = batch_history.to(self.device)
+        batch_e_priv = batch_e_priv.to(self.device)
+
+        with torch.no_grad():
+            target_z = self.priv_encoder(batch_e_priv)
+
+        pred_z = self.student(batch_history)
+        loss = F.mse_loss(pred_z, target_z)
+
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+
+        return float(loss.item())
+
+
+if __name__ == "__main__":
+    torch.manual_seed(42)
+
+    # Dimensionality settings for a 12-DoF humanoid biped
+    proprio_dim = 36   # 12 joint pos, 12 joint vel, 3 IMU gyro, 3 IMU accel, 6 base state
+    action_dim = 12    # 12 joint position setpoints
+    priv_dim = 24      # ground friction, payload mass, CoM offset, joint damping, motor gain errors
+    latent_dim = 8
+    history_len = 50   # 50 timesteps at 50 Hz = 1.0 second history window
+    feature_dim = proprio_dim + action_dim  # 36 + 12 = 48
+
+    # 1. Instantiate Stage 1 Components (Teacher)
+    priv_encoder = PrivilegedEnvironmentEncoder(priv_dim=priv_dim, latent_dim=latent_dim)
+    base_policy = RMABasePolicy(proprio_dim=proprio_dim, latent_dim=latent_dim, action_dim=action_dim)
+
+    # 2. Instantiate Stage 2 Student Component
+    student_module = StudentAdaptationModule(
+        history_len=history_len, feature_dim=feature_dim, latent_dim=latent_dim
+    )
+
+    trainer = RMADistillationTrainer(student_module, priv_encoder, lr=1e-3)
+
+    # 3. Simulate Supervised Distillation Training
+    batch_size = 64
+    print("Beginning Stage 2 Supervised Distillation Training...")
+    for step in range(1, 6):
+        # Synthetic batch sampled from rollout buffer
+        dummy_history = torch.randn(batch_size, history_len, feature_dim)
+        dummy_priv = torch.randn(batch_size, priv_dim)
+
+        loss = trainer.train_step(dummy_history, dummy_priv)
+        print(f"  Step {step}: Distillation MSE Loss = {loss:.6f}")
+
+    # 4. Verify Real-World Deployment Inference
+    student_module.eval()
+    with torch.no_grad():
+        test_history = torch.randn(1, history_len, feature_dim)
+        test_proprio = torch.randn(1, proprio_dim)
+
+        # Onboard execution: Student estimates latent, Base Policy outputs joint action
+        z_hat = student_module(test_history)
+        action_mean, _ = base_policy(test_proprio, z_hat)
+
+        print("\n=== Real-World Deployment Inference Test ===")
+        print(f"  Estimated Latent Vector z_hat shape: {list(z_hat.shape)}")
+        print(f"  Commanded Joint Action shape:        {list(action_mean.shape)}")
+        print(f"  Sample Action Output: {action_mean[0, :4].numpy().round(4)}")
+```
+
+---
+
+## 6. Research Foundations & Seminal Literature
+
+1. **Kumar, A., Fu, Z., Pathak, D., & Malik, J. (2021).** *RMA: Rapid Motor Adaptation for Legged Robots*. In Robotics: Science and Systems (RSS). [The foundational paper establishing two-stage privileged learning with temporal trajectory distillation for quadruped locomotion].
+2. **Nahrendra, I. M. A., Yu, B., & Choi, H. (2023).** *DreamWaQ: Learning Robust Quadrupedal Locomotion With Implicit Terrain Imagination via Deep Reinforcement Learning*. IEEE Transactions on Robotics, 39(6), 4668-4682. [Introduces implicit visual heightmap distillation for rough terrain navigation without explicit elevation mapping].
+3. **Pinto, L., Andrychowicz, M., Welinder, P., Zaremba, W., & Abbeel, P. (2017).** *Asymmetric Actor Critic for Image-Based Robot Learning*. In Robotics: Science and Systems (RSS). [Formulates asymmetric actor-critic where full simulator states train the value network while the policy operates solely on sensor observations].
+4. **Chen, T., Kumar, A., Pathak, D., & Malik, J. (2020).** *Learning Complex Dexterous Manipulation with Privileged Information and Distillation*. arXiv:2010.02941. [Extends privileged distillation to multi-fingered dexterous hands manipulating varied object geometries].
+5. **Miki, T., Lee, J., Hwangbo, J., Wellhausen, L., Koltun, V., & Hutter, M. (2022).** *Learning robust perceptive locomotion for quadrupedal robots in the wild*. Science Robotics, 7(62), eabk2822. [Demonstrates privileged visual and tactile distillation navigating mountain trails and snowy forests].
+
+---
+
+## 7. Hands-On Lab Project: Terrain Incline Adaptation via RMA
+
+### Project Objective
+In this lab, you will implement and train an RMA student adaptation module in PyTorch to estimate terrain slope inclination and surface friction from a robot's rolling joint velocity and torque history.
+
+### Implementation Steps
+1. Configure an Isaac Sim / Isaac Lab environment where a bipedal robot walks across randomly sampled slope inclines ($\theta_{\text{slope}} \in [-20^\circ, +20^\circ]$) with friction coefficients ($\mu \in [0.2, 1.0]$).
+2. Record rollout buffers storing paired tuples of $(\mathbf{H}_t, \mathbf{e}_t)$ across 50,000 timesteps.
+3. Train the 1D CNN student adaptation network using the MSE distillation loss against the privileged encoder's latent representation.
+4. Evaluate latent prediction accuracy $\hat{\mathbf{z}}_t$ when transitioning abruptly from flat high-friction ground ($\mu = 0.9$) onto a $15^\circ$ low-friction ramp ($\mu = 0.3$). Measure adaptation latency in milliseconds.
+
+### Lab Success Criteria
+- [ ] Confirm that the Stage 1 Privileged Encoder compresses the 24-DoF physics vector into an 8-DoF latent space with zero divergence.
+- [ ] Achieve a distillation MSE loss $< 0.025$ on an independent validation set of trajectory logs.
+- [ ] Measure student inference latency on an NVIDIA Jetson AGX Orin, confirming execution time $< 1.2\text{ ms}$ per iteration.
+- [ ] Demonstrate zero-shot bipedal balance recovery within 3 gait cycles (under $150\text{ ms}$) upon entering an unmodeled $15^\circ$ slippery incline.
+
+---
+
+<ChapterProgress chapterId="9-4-privileged-learning" moduleId="module9" totalChapters={8} />
+
+## Chapter Mastery Check
+
+<QuizEngine
+  quizId="quiz-9-4"
+  title="Module 9.4 Mastery Check: Privileged Learning & RMA"
+  moduleId="module9"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why is the critic in Asymmetric Actor-Critic (AAC) permitted to observe privileged information (like ground friction and exact terrain height) while the actor is not?",
+      options: [
+        "Because the critic is more computationally efficient than the actor",
+        "Because the critic is only used to compute advantage values during training and is completely discarded prior to real-world robot deployment",
+        "Because the actor network does not require gradient backpropagation",
+        "Because PyTorch cannot serialize actor networks with multiple inputs"
+      ],
+      correctIndex: 1,
+      explanation: "During policy execution on the physical robot, only the actor network pi(a|s) is deployed. The critic V(s, e) exists solely to provide low-variance value baselines during PPO training updates inside the simulator."
+    },
+    {
+      id: "q2",
+      question: "How does the RMA student adaptation module predict physical properties (such as payload mass or ground friction) without having direct access to external sensors?",
+      options: [
+        "By querying a cloud database over 5G",
+        "By decoding the physical interactions (foot slip, deceleration, posture deflection) implicitly embedded within a temporal window of past proprioceptive states and commanded actions",
+        "By using GPS coordinates to look up local weather conditions",
+        "By performing random guesses until the reward increases"
+      ],
+      correctIndex: 1,
+      explanation: "When a robot walks on slippery ice or carries a heavy payload, its joint accelerations, tracking errors, and IMU deflections deviate from nominal expectations. A 1D convolutional network over a 50-step history window can decode these implicit dynamical signatures to accurately estimate the latent environmental context."
+    },
+    {
+      id: "q3",
+      question: "In the RMA two-stage training paradigm, why are the weights of the base policy and privileged encoder frozen during Stage 2 distillation?",
+      options: [
+        "To save GPU memory during training",
+        "To prevent policy drift and maintain the optimal control primitives learned in Stage 1 while the student adaptation module learns to match the latent context",
+        "Because PyTorch does not support backpropagation through two networks simultaneously",
+        "To prevent the robot from overheating"
+      ],
+      correctIndex: 1,
+      explanation: "Freezing the base policy decouples the RL control problem from the supervised representation learning problem. The student module focuses entirely on solving an MSE regression task (z_hat -> z), eliminating policy instability and catastrophic forgetting."
+    }
+  ]}
+/>
