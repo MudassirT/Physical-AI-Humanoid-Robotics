@@ -1,0 +1,488 @@
+---
+sidebar_position: 1
+title: "Theoretical Foundations of Reinforcement Learning & Dynamic Programming"
+description: "Markov Decision Processes, Bellman expectation and optimality equations, contraction mappings, Policy and Value Iteration, Monte Carlo methods, and TD(lambda) with eligibility traces."
+---
+
+import ChapterProgress from '@site/src/components/ChapterProgress';
+import QuizEngine from '@site/src/components/QuizEngine';
+
+# Theoretical Foundations of Reinforcement Learning & Dynamic Programming
+
+Classical robot control relies upon explicit dynamic models—such as Newton-Euler recursions, Euler-Lagrange equations, or rigid-body contact linear complementarity problems (LCP). However, when a bipedal robot traverses unpredictable terrains, encounters unmodeled non-linear compliance, or interacts with deformable objects, analytical physics models accumulate substantial discrepancies. Reinforcement learning (RL) formalizes optimal decision-making directly from environmental interaction under closed-loop uncertainty.
+
+Rather than synthesizing an explicit trajectory optimization pipeline by hand, an embodied agent explores its environment, receives scalar feedback signals, and optimizes a parameterized policy to maximize long-term cumulative discounted return. Grounded in measure-theoretic Markov Decision Processes (MDPs) and functional contraction mappings, reinforcement learning bridges the gap between classical dynamic programming and modern autonomous robot motor skills.
+
+```mermaid
+flowchart TD
+    subgraph MDPInteraction["Markov Decision Process (MDP) Interaction Loop"]
+        Agent["Embodied Robot Agent (Policy π)"]
+        Env["Physical / Simulated Environment"]
+        
+        Agent -->|Action a_t ∈ A| Env
+        Env -->|State s_{t+1} ∈ S| Agent
+        Env -->|Reward r_{t+1} ∈ R| Agent
+    end
+
+    subgraph DPBackups["Dynamic Programming & TD Backup Operators"]
+        VNode["V(s)"]
+        ANode1["Action a_1"]
+        ANode2["Action a_2"]
+        SPrime1["s' ~ P(s'|s, a_1)"]
+        SPrime2["s' ~ P(s'|s, a_2)"]
+
+        VNode --> ANode1
+        VNode --> ANode2
+        ANode1 --> SPrime1
+        ANode2 --> SPrime2
+    end
+```
+
+---
+
+## 1. The Markov Decision Process (MDP)
+
+An embodied robot's sequential decision problem is modeled as a 5-tuple:
+
+$$
+\mathcal{M} = \left(\mathcal{S}, \mathcal{A}, \mathcal{P}, \mathcal{R}, \gamma\right)
+$$
+
+where:
+- $\mathcal{S}$ is the state space (e.g., generalized joint coordinates $\mathbf{q} \in \mathbb{R}^n$, joint velocities $\dot{\mathbf{q}} \in \mathbb{R}^n$, base orientation $\mathbf{R} \in \mathrm{SO}(3)$, and IMU linear accelerations).
+- $\mathcal{A}$ is the action space (e.g., motor torques $\boldsymbol{\tau} \in \mathbb{R}^n$, position setpoint deltas $\Delta \mathbf{q}_{\mathrm{des}}$, or PD target velocities).
+- $\mathcal{P}: \mathcal{S} \times \mathcal{A} \times \mathcal{S} \rightarrow [0, 1]$ is the state transition probability density:
+  
+  $$
+  \mathcal{P}(s' \mid s, a) = \mathbb{P}\left(S_{t+1} = s' \mid S_t = s, A_t = a\right)
+  $$
+
+- $\mathcal{R}: \mathcal{S} \times \mathcal{A} \times \mathcal{S} \rightarrow \mathbb{R}$ is the reward function, yielding scalar return $R_{t+1} = \mathcal{R}(S_t, A_t, S_{t+1})$.
+- $\gamma \in [0, 1)$ is the temporal discount factor ensuring bounded returns over infinite horizons.
+
+### The Markov Property
+A stochastic process possesses the Markov property if the conditional probability distribution of future states depends solely upon the present state and action, independent of the past path history:
+
+$$
+\mathbb{P}\left(S_{t+1} = s_{t+1}, R_{t+1} = r_{t+1} \mid S_t = s_t, A_t = a_t, S_{t-1} = s_{t-1}, A_{t-1} = a_{t-1}, \dots, S_0 = s_0, A_0 = a_0\right) = \mathbb{P}\left(S_{t+1} = s_{t+1}, R_{t+1} = r_{t+1} \mid S_t = s_t, A_t = a_t\right)
+$$
+
+In physical humanoids, latency in the CAN-FD/EtherCAT bus, unobserved thermal expansions, or joint backlash induce non-Markovian dynamics. To recover Markovian representations, roboticists construct *augmented state vectors* concatenating historical observations:
+
+$$
+\tilde{s}_t = \left[o_t, o_{t-1}, o_{t-2}, \dots, o_{t-H}, a_{t-1}, a_{t-2}\right]
+$$
+
+---
+
+## 2. Value Functions & Bellman Equations
+
+The objective of an agent governed by policy $\pi(a \mid s) = \mathbb{P}(A_t = a \mid S_t = s)$ is to maximize the expected discounted return:
+
+$$
+G_t = \sum_{k=0}^{\infty} \gamma^k R_{t+k+1}
+$$
+
+### State-Value Function $V^\pi(s)$
+The state-value function $V^\pi(s)$ expresses the expected return initiating from state $s$ under policy $\pi$:
+
+$$
+V^\pi(s) = \mathbb{E}_\pi \left[ G_t \mid S_t = s \right] = \mathbb{E}_\pi \left[ \sum_{k=0}^{\infty} \gamma^k R_{t+k+1} \;\middle|\; S_t = s \right]
+$$
+
+### Action-Value Function $Q^\pi(s, a)$
+The action-value function $Q^\pi(s, a)$ expresses the expected return taking action $a$ in state $s$, and subsequently adhering to policy $\pi$:
+
+$$
+Q^\pi(s, a) = \mathbb{E}_\pi \left[ G_t \mid S_t = s, A_t = a \right] = \mathbb{E}_\pi \left[ R_{t+1} + \gamma V^\pi(S_{t+1}) \;\middle|\; S_t = s, A_t = a \right]
+$$
+
+### Bellman Expectation Equations
+Decomposing the expectation recursively yields:
+
+$$
+V^\pi(s) = \sum_{a \in \mathcal{A}} \pi(a \mid s) \sum_{s' \in \mathcal{S}} \mathcal{P}(s' \mid s, a) \left[ \mathcal{R}(s, a, s') + \gamma V^\pi(s') \right]
+$$
+
+$$
+Q^\pi(s, a) = \sum_{s' \in \mathcal{S}} \mathcal{P}(s' \mid s, a) \left[ \mathcal{R}(s, a, s') + \gamma \sum_{a' \in \mathcal{A}} \pi(a' \mid s') Q^\pi(s', a') \right]
+$$
+
+### Bellman Optimality Equations
+An optimal policy $\pi^*$ satisfies $V^*(s) = \max_\pi V^\pi(s)$ and $Q^*(s, a) = \max_\pi Q^\pi(s, a)$ for all $s \in \mathcal{S}, a \in \mathcal{A}$:
+
+$$
+V^*(s) = \max_{a \in \mathcal{A}} \sum_{s' \in \mathcal{S}} \mathcal{P}(s' \mid s, a) \left[ \mathcal{R}(s, a, s') + \gamma V^*(s') \right]
+$$
+
+$$
+Q^*(s, a) = \sum_{s' \in \mathcal{S}} \mathcal{P}(s' \mid s, a) \left[ \mathcal{R}(s, a, s') + \gamma \max_{a' \in \mathcal{A}} Q^*(s', a') \right]
+$$
+
+---
+
+## 3. Contraction Mapping & Dynamic Programming
+
+Let $\mathcal{B}(\mathcal{S})$ denote the Banach space of bounded real-valued functions over $\mathcal{S}$ equipped with the infinity norm $\|V\|_\infty = \max_{s \in \mathcal{S}} |V(s)|$.
+
+### Definition: Contraction Operator
+An operator $T: \mathcal{B}(\mathcal{S}) \rightarrow \mathcal{B}(\mathcal{S})$ is a $\gamma$-contraction if for all $u, v \in \mathcal{B}(\mathcal{S})$:
+
+$$
+\|T u - T v\|_\infty \le \gamma \|u - v\|_\infty, \quad \text{where } 0 \le \gamma &lt; 1
+$$
+
+### Theorem: Banach Fixed-Point Theorem
+For any contraction mapping $T$ on a complete metric space:
+1. $T$ possesses a unique fixed point $V^* \in \mathcal{B}(\mathcal{S})$ such that $T V^* = V^*$.
+2. The sequence $V_{k+1} = T V_k$ converges linearly to $V^*$ from any arbitrary initial $V_0$:
+   
+   $$
+   \|V_k - V^*\|_\infty \le \frac{\gamma^k}{1 - \gamma} \|V_1 - V_0\|_\infty
+   $$
+
+### Proof of Contraction for Bellman Optimality Operator $T^*$
+Define $(T^* V)(s) = \max_{a} \sum_{s'} \mathcal{P}(s' \mid s, a) [\mathcal{R}(s, a, s') + \gamma V(s')]$. For any $u, v$:
+
+$$
+\begin{aligned}
+|(T^* u)(s) - (T^* v)(s)| &= \left| \max_a \sum_{s'} \mathcal{P}(s' \mid s, a) [r + \gamma u(s')] - \max_{a'} \sum_{s'} \mathcal{P}(s' \mid s, a') [r + \gamma v(s')] \right| \\
+&\le \max_a \left| \sum_{s'} \mathcal{P}(s' \mid s, a) \gamma (u(s') - v(s')) \right| \\
+&\le \gamma \max_a \sum_{s'} \mathcal{P}(s' \mid s, a) |u(s') - v(s')| \\
+&\le \gamma \|u - v\|_\infty \sum_{s'} \mathcal{P}(s' \mid s, a) = \gamma \|u - v\|_\infty
+\end{aligned}
+$$
+
+Taking the supremum over all $s \in \mathcal{S}$ establishes $\|T^* u - T^* v\|_\infty \le \gamma \|u - v\|_\infty$.
+
+---
+
+## 4. Policy Iteration vs. Value Iteration
+
+Dynamic programming solves known MDPs via two foundational paradigms:
+
+### Policy Iteration
+Alternates between full policy evaluation and greedy policy improvement:
+1. **Policy Evaluation**: Solves the linear system $V^{\pi_k} = (I - \gamma \mathcal{P}^{\pi_k})^{-1} \mathcal{R}^{\pi_k}$ iteratively until $\|V_{j+1} - V_j\|_\infty &lt; \epsilon$.
+2. **Policy Improvement**: 
+   
+   $$
+   \pi_{k+1}(s) = \arg\max_{a \in \mathcal{A}} \sum_{s'} \mathcal{P}(s' \mid s, a) \left[ \mathcal{R}(s, a, s') + \gamma V^{\pi_k}(s') \right]
+   $$
+
+By the **Policy Improvement Theorem**, $V^{\pi_{k+1}}(s) \ge V^{\pi_k}(s)$ for all $s \in \mathcal{S}$.
+
+### Value Iteration
+Combines evaluation and improvement into a single step via $T^*$:
+
+$$
+V_{k+1}(s) \leftarrow \max_{a \in \mathcal{A}} \sum_{s'} \mathcal{P}(s' \mid s, a) \left[ \mathcal{R}(s, a, s') + \gamma V_k(s') \right]
+$$
+
+Once $\|V_{k+1} - V_k\|_\infty &lt; \frac{\epsilon(1 - \gamma)}{2\gamma}$, the extracted policy $\pi(s) = \arg\max_a \sum_{s'} \mathcal{P}(s' \mid s, a) [r + \gamma V(s')]$ is guaranteed to be $\epsilon$-optimal.
+
+---
+
+## 5. Model-Free Prediction: Monte Carlo vs. TD($\lambda$)
+
+When transition dynamics $\mathcal{P}$ and rewards $\mathcal{R}$ are unknown, the robot must learn from empirical interaction tuples $(S_t, A_t, R_{t+1}, S_{t+1})$.
+
+### Monte Carlo (MC) Methods
+MC estimates values by computing sample empirical averages of total return $G_t$ across completed episodes:
+
+$$
+V(S_t) \leftarrow V(S_t) + \alpha \left[ G_t - V(S_t) \right]
+$$
+
+- **Advantage**: Unbiased ($\mathbb{E}[G_t \mid S_t = s] = V^\pi(s)$), invariant to non-Markovian transitions.
+- **Disadvantage**: High variance; strictly requires episodic tasks; zero online updates during execution.
+
+### Temporal Difference Learning: TD(0)
+TD(0) bootstraps from the immediate reward and subsequent value estimate:
+
+$$
+V(S_t) \leftarrow V(S_t) + \alpha \delta_t, \quad \delta_t = R_{t+1} + \gamma V(S_{t+1}) - V(S_t)
+$$
+
+where $\delta_t$ is the **one-step TD error**.
+- **Advantage**: Dramatically reduced variance, fully online and incremental.
+- **Disadvantage**: Biased initially by inaccurate value estimates $V(S_{t+1})$.
+
+### TD($\lambda$) & Eligibility Traces
+TD($\lambda$) seamlessly bridges one-step TD and infinite-horizon Monte Carlo through the geometric $\lambda$-return:
+
+$$
+G_t^\lambda = (1 - \lambda) \sum_{n=1}^{\infty} \lambda^{n-1} G_{t:t+n}
+$$
+
+In practice, backward-view eligibility traces $E_t(s)$ provide an efficient online implementation:
+
+$$
+E_0(s) = 0, \quad E_t(s) = \gamma \lambda E_{t-1}(s) + \mathbf{1}(S_t = s)
+$$
+
+For every visited state $s \in \mathcal{S}$:
+
+$$
+V(s) \leftarrow V(s) + \alpha \delta_t E_t(s)
+$$
+
+---
+
+## 6. Algorithmic Trade-off Analysis
+
+| Method | Transition Model Required? | Bootstrap? | Variance | Computational Complexity per Step | Suitable for Robot Locomotion? |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Value Iteration** | Yes ($\mathcal{P}$) | Yes | Zero (Exact) | $\mathcal{O}(\vert\mathcal{S}\vert^2 \vert\mathcal{A}\vert)$ | Low (Curse of Dimensionality in continuous spaces) |
+| **Policy Iteration** | Yes ($\mathcal{P}$) | Yes | Zero (Exact) | $\mathcal{O}(\vert\mathcal{S}\vert^3 + \vert\mathcal{S}\vert^2 \vert\mathcal{A}\vert)$ | Low (Discrete toy benchmarks only) |
+| **Every-Visit Monte Carlo** | No (Model-Free) | No | High | $\mathcal{O}(1)$ | Moderate (Only for simulated episodic rollouts) |
+| **TD(0)** | No (Model-Free) | Yes (1-step) | Low | $\mathcal{O}(1)$ | High (Foundation for Deep Q-Networks & Actor-Critic) |
+| **TD($\lambda$)** | No (Model-Free) | Yes ($\lambda$-weighted) | Moderate | $\mathcal{O}(\vert\mathcal{S}\vert)$ tabular / $\mathcal{O}(d)$ linear | High (Accelerates credit assignment across multi-contact gaits) |
+
+---
+
+## 7. Complete Implementation: Value Iteration & TD($\lambda$)
+
+The following production script implements both Dynamic Programming Value Iteration and Model-Free Backward-View TD($\lambda$) with accumulating eligibility traces for an autonomous mobile robot navigation gridworld:
+
+```python
+"""
+theoretical_rl_foundations.py
+Comprehensive implementation of Value Iteration and TD(lambda) with eligibility traces.
+"""
+
+from typing import Dict, List, Tuple
+import numpy as np
+
+
+class GridWorldNavigationMDP:
+    """
+    GridWorld environment modeling a differential-drive robot navigating 
+    hazardous obstacles to reach a target recharging dock.
+    """
+    def __init__(self, rows: int = 5, cols: int = 5, gamma: float = 0.95):
+        self.rows = rows
+        self.cols = cols
+        self.gamma = gamma
+        self.num_states = rows * cols
+        
+        # 0: Up, 1: Right, 2: Down, 3: Left
+        self.actions = [0, 1, 2, 3]
+        self.num_actions = len(self.actions)
+        
+        self.terminal_states = {self._coords_to_idx(rows - 1, cols - 1): 10.0} # Goal
+        self.hazard_states = {self._coords_to_idx(1, 1): -10.0, self._coords_to_idx(2, 2): -10.0}
+        
+    def _coords_to_idx(self, r: int, c: int) -> int:
+        return r * self.cols + c
+
+    def _idx_to_coords(self, idx: int) -> Tuple[int, int]:
+        return divmod(idx, self.cols)
+
+    def transition_probabilities(self, s: int, a: int) -> List[Tuple[float, int, float]]:
+        """
+        Returns list of (probability, next_state, reward) tuples.
+        Models slip: 80% intended direction, 10% orthogonal left, 10% orthogonal right.
+        """
+        if s in self.terminal_states:
+            return [(1.0, s, 0.0)]
+
+        r, c = self._idx_to_coords(s)
+        deltas = {0: (-1, 0), 1: (0, 1), 2: (1, 0), 3: (0, -1)}
+        
+        transitions = []
+        action_outcomes = [
+            (a, 0.8),               # Intended
+            ((a - 1) % 4, 0.1),     # Orthogonal slip CCW
+            ((a + 1) % 4, 0.1)      # Orthogonal slip CW
+        ]
+
+        for act, prob in action_outcomes:
+            dr, dc = deltas[act]
+            nr = max(0, min(self.rows - 1, r + dr))
+            nc = max(0, min(self.cols - 1, c + dc))
+            ns = self._coords_to_idx(nr, nc)
+            
+            # Base step cost for energy dissipation
+            step_reward = -0.1
+            if ns in self.terminal_states:
+                step_reward += self.terminal_states[ns]
+            elif ns in self.hazard_states:
+                step_reward += self.hazard_states[ns]
+                
+            transitions.append((prob, ns, step_reward))
+            
+        return transitions
+
+    def step(self, s: int, a: int) -> Tuple[int, float, bool]:
+        """Model-free environment execution step."""
+        trans = self.transition_probabilities(s, a)
+        probs = [t[0] for t in trans]
+        choice_idx = np.random.choice(len(trans), p=probs)
+        _, next_state, reward = trans[choice_idx]
+        done = next_state in self.terminal_states
+        return next_state, reward, done
+
+
+def run_value_iteration(env: GridWorldNavigationMDP, tolerance: float = 1e-6) -> np.ndarray:
+    """
+    Solves Bellman Optimality Equation via contraction operator T*.
+    """
+    V = np.zeros(env.num_states, dtype=np.float64)
+    iteration = 0
+    
+    while True:
+        delta = 0.0
+        V_new = np.copy(V)
+        for s in range(env.num_states):
+            if s in env.terminal_states:
+                continue
+                
+            action_values = []
+            for a in env.actions:
+                expected_q = 0.0
+                for prob, s_prime, reward in env.transition_probabilities(s, a):
+                    expected_q += prob * (reward + env.gamma * V[s_prime])
+                action_values.append(expected_q)
+                
+            V_new[s] = max(action_values)
+            delta = max(delta, abs(V_new[s] - V[s]))
+            
+        V = V_new
+        iteration += 1
+        if delta < tolerance:
+            break
+            
+    print(f"[Value Iteration] Converged in {iteration} iterations (Tolerance: {tolerance}).")
+    return V
+
+
+def run_td_lambda(env: GridWorldNavigationMDP, 
+                  episodes: int = 1500, 
+                  alpha: float = 0.05, 
+                  lambda_param: float = 0.7) -> np.ndarray:
+    """
+    Model-Free Backward-View TD(lambda) with accumulating eligibility traces.
+    """
+    V = np.zeros(env.num_states, dtype=np.float64)
+    
+    for ep in range(episodes):
+        E = np.zeros(env.num_states, dtype=np.float64)
+        s = 0  # Starting state (0, 0)
+        done = False
+        
+        while not done:
+            # Simple epsilon-greedy exploration
+            a = np.random.choice(env.actions)
+            next_state, reward, done = env.step(s, a)
+            
+            # TD Error calculation
+            td_target = reward + (0.0 if done else env.gamma * V[next_state])
+            td_error = td_target - V[s]
+            
+            # Accumulating eligibility trace update
+            E[s] += 1.0
+            
+            # Global value function and trace decay updates
+            V += alpha * td_error * E
+            E *= env.gamma * lambda_param
+            
+            s = next_state
+            
+    return V
+
+
+if __name__ == "__main__":
+    np.random.seed(42)
+    world = GridWorldNavigationMDP(rows=4, cols=4, gamma=0.95)
+    
+    # 1. Exact Dynamic Programming Solution
+    v_optimal = run_value_iteration(world)
+    print("Optimal State-Values (Value Iteration):\n", v_optimal.reshape(4, 4))
+    
+    # 2. Empirical TD(lambda) Prediction
+    v_td_lambda = run_td_lambda(world, episodes=3000, alpha=0.03, lambda_param=0.8)
+    print("\nEstimated State-Values (TD(lambda = 0.8)):\n", v_td_lambda.reshape(4, 4))
+    
+    mae = np.mean(np.abs(v_optimal - v_td_lambda))
+    print(f"\nMean Absolute Estimation Error: {mae:.4f}")
+```
+
+---
+
+## 8. Hands-On Lab Project: Empirical Evaluation of $\lambda$-Returns
+
+### Project Objective
+Assess how the trace-decay parameter $\lambda \in [0.0, 1.0]$ governs the bias-variance trade-off during robot navigation policy evaluation.
+
+### Tasks
+1. Instantiate the `GridWorldNavigationMDP` configured with slippery surface mechanics ($\mathbb{P}(\text{slip}) = 0.25$).
+2. Evaluate 5 distinct trace settings: $\lambda \in \{0.0, 0.3, 0.6, 0.9, 1.0\}$.
+3. Compute the Root Mean Squared Error (RMSE) against the ground-truth $V^*$ obtained from Value Iteration over 5,000 learning steps across 20 random seeds.
+4. Plot the error convergence trajectories.
+
+### Verification & Success Criteria
+- $\lambda = 0.0$ (TD(0)) exhibits low variance but slower initial bias dissipation.
+- $\lambda = 1.0$ (Monte Carlo equivalent) demonstrates high variance and sluggish convergence in stochastic MDPs.
+- Intermediate values ($\lambda \in [0.6, 0.8]$) achieve the lowest asymptotic RMSE ($\text{RMSE} &lt; 0.35$).
+
+---
+
+## 9. Research Foundations & Seminal Literature
+
+1. **Bellman, R. (1957).** *Dynamic Programming*. Princeton University Press. [Introduced the principle of optimality and foundational dynamic programming formulations].
+2. **Sutton, R. S., & Barto, A. G. (2018).** *Reinforcement Learning: An Introduction* (2nd ed.). MIT Press. [Definitive reference for TD($\lambda$), policy evaluation, and eligibility traces].
+3. **Watkins, C. J., & Dayan, P. (1992).** *Q-learning*. Machine Learning, 8(3), 279-292. [Proved convergence of model-free off-policy temporal difference control].
+4. **Singh, S. P., & Sutton, R. S. (1996).** *Reinforcement learning with replacing eligibility traces*. Machine Learning, 22(1), 123-158. [Analyzed theoretical properties of accumulating vs. replacing eligibility traces].
+5. **Bertsekas, D. P. (2012).** *Dynamic Programming and Optimal Control* (Vol. II, 4th ed.). Athena Scientific. [Rigorous functional analysis and contraction mappings in Markov Decision Processes].
+
+---
+
+<ChapterProgress chapterId="8-1-foundations-of-reinforcement-learning" moduleId="module8" totalChapters={10} />
+
+## Chapter Mastery Check
+
+<QuizEngine
+  quizId="quiz-8-1"
+  title="Module 8.1 Mastery Check: Foundations of Reinforcement Learning"
+  moduleId="module8"
+  passThreshold={70}
+  questions={[
+    {
+      id: "q1",
+      question: "Why is the Bellman Optimality Operator T* guaranteed to converge to a unique fixed-point value function V*?",
+      options: [
+        "Because the reward function R is always strictly positive",
+        "Because T* is a gamma-contraction mapping under the supremum infinity-norm on a complete Banach space, satisfying the Banach Fixed-Point Theorem for gamma in [0, 1)",
+        "Because policy iteration evaluates all discrete permutations of actions simultaneously",
+        "Because physical robot actuators obey passive dissipation bounds"
+      ],
+      correctIndex: 1,
+      explanation: "Under the infinity norm, ||T* u - T* v||_inf <= gamma ||u - v||_inf. Since gamma < 1, T* is a strict contraction mapping on the complete metric space of bounded value functions, guaranteeing a unique fixed point V* by the Banach Fixed-Point Theorem."
+    },
+    {
+      id: "q2",
+      question: "In robotic motor control with high-frequency tactile and motor feedback, what is the primary structural distinction between TD(0) and Monte Carlo methods?",
+      options: [
+        "TD(0) cannot update value estimates until an episode terminates with a terminal state",
+        "Monte Carlo methods require an explicit analytical transition model P(s' | s, a), whereas TD(0) does not",
+        "TD(0) updates incrementally at each step by bootstrapping off V(S_{t+1}), yielding lower variance but initial bias, while Monte Carlo uses the full sample return G_t, yielding zero bias but high variance",
+        "TD(0) cannot be used in episodic environments"
+      ],
+      correctIndex: 2,
+      explanation: "TD(0) utilizes immediate single-step transitions and bootstraps from V(S_{t+1}) to form its target, drastically lowering variance at the expense of initial bias. Monte Carlo computes un-bootstrapped sample returns G_t after episode completion, possessing zero bias but high variance."
+    },
+    {
+      id: "q3",
+      question: "How do backward-view eligibility traces in TD(lambda) approximate the forward-view theoretical lambda-return online?",
+      options: [
+        "By storing past trajectory buffers in external RAM and running backpropagation through time",
+        "By decaying a per-state visitation memory trace by gamma * lambda each time step and scaling the immediate TD error delta_t across all previously active states",
+        "By setting the discount factor gamma = 1.0 during active contacts",
+        "By running Value Iteration concurrently on a dedicated GPU thread"
+      ],
+      correctIndex: 1,
+      explanation: "Backward-view eligibility traces maintain an accumulating or replacing memory variable E_t(s) that decays geometrically by gamma * lambda every step. When an unexpected reward generates a non-zero TD error delta_t, credit is propagated backward immediately to all active states proportionally to E_t(s)."
+    }
+  ]}
+/>
