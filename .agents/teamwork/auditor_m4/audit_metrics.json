@@ -1,0 +1,1322 @@
+{
+  "summary": {
+    "total_chapters": 20,
+    "total_words": 64393,
+    "min_words": 2320,
+    "max_words": 4850,
+    "chapters_under_1800": [],
+    "chapters_missing_cp": [
+      "10-1-humanoid-mechanical-design.mdx",
+      "10-2-actuator-technologies.mdx",
+      "10-3-power-electronics-and-motor-control.mdx",
+      "10-4-communication-buses.mdx",
+      "10-5-compute-platforms.mdx",
+      "10-6-sensor-hardware.mdx",
+      "10-7-real-time-embedded-software.mdx",
+      "10-8-system-integration-and-testing.mdx",
+      "11-1-robot-safety-standards.mdx",
+      "11-2-functional-safety-architecture.mdx",
+      "11-3-human-robot-interaction-safety.mdx",
+      "11-4-ethics-of-autonomous-humanoids.mdx",
+      "11-5-privacy-and-data-governance.mdx",
+      "11-6-deployment-operations.mdx"
+    ],
+    "chapters_missing_qe": [],
+    "chapters_invalid_fm": [],
+    "suspicious_code_count": 2,
+    "modules": {
+      "module10-hardware-architecture": {
+        "chapters": 8,
+        "total_words": 24479,
+        "avg_words_per_chapter": 3059.9
+      },
+      "module11-safety-ethics": {
+        "chapters": 6,
+        "total_words": 22138,
+        "avg_words_per_chapter": 3689.7
+      },
+      "module12-capstone-frontiers": {
+        "chapters": 6,
+        "total_words": 17776,
+        "avg_words_per_chapter": 2962.7
+      }
+    },
+    "avg_words_overall": 3219.7
+  },
+  "details": {
+    "module10-hardware-architecture": [
+      {
+        "filename": "10-1-humanoid-mechanical-design.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 4112,
+        "prose_words": 1490,
+        "frontmatter": {
+          "sidebar_position": "1",
+          "title": "Humanoid Mechanical Architecture & Structural Optimization",
+          "description": "Anthropomorphic vs functional optimization, DOF allocation across pelvis, legs, and torso, serial vs parallel 4-bar linkages, swinging limb inertia minimization, structural materials, and flagship teardowns."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "1",
+        "title": "Humanoid Mechanical Architecture & Structural Optimization",
+        "description": "Anthropomorphic vs functional optimization, DOF allocation across pelvis, legs, and torso, serial vs parallel 4-bar linkages, swinging limb inertia minimization, structural materials, and flagship teardowns.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 16,
+            "words": 110,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 27,
+            "words": 129,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 10,
+            "words": 48,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 14,
+            "words": 74,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 23,
+            "words": 99,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 215,
+            "words": 842,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 103,
+          "block_count": 14
+        },
+        "citations_count": 6
+      },
+      {
+        "filename": "10-2-actuator-technologies.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 2911,
+        "prose_words": 1027,
+        "frontmatter": {
+          "sidebar_position": "2",
+          "title": "Actuator Technologies: Quasi-Direct Drive, Harmonic Drives & SEAs",
+          "description": "BLDC and PMSM motor theory, Quasi-Direct Drive (QDD), Strain Wave / Harmonic Drives, Series Elastic Actuators (SEA), reflected inertia, and electro-thermal sizing for bipedal humanoids."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "2",
+        "title": "Actuator Technologies: Quasi-Direct Drive, Harmonic Drives & SEAs",
+        "description": "BLDC and PMSM motor theory, Quasi-Direct Drive (QDD), Strain Wave / Harmonic Drives, Series Elastic Actuators (SEA), reflected inertia, and electro-thermal sizing for bipedal humanoids.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 5,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 16,
+            "words": 100,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 9,
+            "words": 58,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 7,
+            "words": 44,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 29,
+            "words": 66,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 155,
+            "words": 611,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 76,
+          "block_count": 13
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "10-3-power-electronics-and-motor-control.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 3393,
+        "prose_words": 1336,
+        "frontmatter": {
+          "sidebar_position": "3",
+          "title": "Power Electronics, FOC Motor Control & Battery Systems",
+          "description": "Field Oriented Control (FOC), Clarke and Park transforms, Space Vector PWM (SVPWM), 20 kHz current control, GaN gate drivers, dead-time, and 48V battery architectures."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "3",
+        "title": "Power Electronics, FOC Motor Control & Battery Systems",
+        "description": "Field Oriented Control (FOC), Clarke and Park transforms, Space Vector PWM (SVPWM), 20 kHz current control, GaN gate drivers, dead-time, and 48V battery architectures.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 20,
+            "words": 137,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 11,
+            "words": 36,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 8,
+            "words": 34,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 16,
+            "words": 56,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 77,
+            "flags": []
+          },
+          {
+            "lang": "cpp",
+            "lines": 223,
+            "words": 1051,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 102,
+          "block_count": 13
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "10-4-communication-buses.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 3006,
+        "prose_words": 807,
+        "frontmatter": {
+          "sidebar_position": "4",
+          "title": "Deterministic Communication Buses: EtherCAT, CAN-FD & High-Speed Links",
+          "description": "Deterministic real-time networks, EtherCAT processing on-the-fly, CAN-FD 8 Mbit/s protocols, MIPI CSI-2 camera links, and humanoid wiring harness design."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "4",
+        "title": "Deterministic Communication Buses: EtherCAT, CAN-FD & High-Speed Links",
+        "description": "Deterministic real-time networks, EtherCAT processing on-the-fly, CAN-FD 8 Mbit/s protocols, MIPI CSI-2 camera links, and humanoid wiring harness design.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 29,
+            "words": 136,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 4,
+            "words": 38,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 15,
+            "words": 100,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 8,
+            "words": 95,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 15,
+            "words": 59,
+            "flags": []
+          },
+          {
+            "lang": "cpp",
+            "lines": 199,
+            "words": 773,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 55,
+          "block_count": 5
+        },
+        "citations_count": 4
+      },
+      {
+        "filename": "10-5-compute-platforms.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 2522,
+        "prose_words": 734,
+        "frontmatter": {
+          "sidebar_position": "5",
+          "title": "Heterogeneous Compute Platforms: Jetson AGX Orin, NPUs & FPGAs",
+          "description": "Embedded compute architecture for physical humanoids, NVIDIA Jetson AGX Orin vs Thor, Tensor Cores, DLA, PVA, FPGA co-processors, Roofline performance models, and power budgeting."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "5",
+        "title": "Heterogeneous Compute Platforms: Jetson AGX Orin, NPUs & FPGAs",
+        "description": "Embedded compute architecture for physical humanoids, NVIDIA Jetson AGX Orin vs Thor, Tensor Cores, DLA, PVA, FPGA co-processors, Roofline performance models, and power budgeting.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 5,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 24,
+            "words": 124,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 14,
+            "words": 78,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 13,
+            "words": 37,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 7,
+            "words": 54,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 126,
+            "words": 440,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 68,
+          "block_count": 5
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "10-6-sensor-hardware.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 2857,
+        "prose_words": 1326,
+        "frontmatter": {
+          "sidebar_position": "6",
+          "title": "Sensor Hardware Integration: Cameras, IMUs, LiDARs & F/T Sensors",
+          "description": "Hardware teardowns of global shutter stereo cameras, industrial MEMS IMUs, solid-state LiDARs, 6-axis F/T sensors, Allan variance modeling, and IEEE 1588 PTP synchronization."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "6",
+        "title": "Sensor Hardware Integration: Cameras, IMUs, LiDARs & F/T Sensors",
+        "description": "Hardware teardowns of global shutter stereo cameras, industrial MEMS IMUs, solid-state LiDARs, 6-axis F/T sensors, Allan variance modeling, and IEEE 1588 PTP synchronization.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 24,
+            "words": 161,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 11,
+            "words": 92,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 11,
+            "words": 52,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 5,
+            "words": 56,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 8,
+            "words": 45,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 137,
+            "words": 561,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 70,
+          "block_count": 8
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "10-7-real-time-embedded-software.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 2865,
+        "prose_words": 429,
+        "frontmatter": {
+          "sidebar_position": "7",
+          "title": "Real-Time Embedded Firmware: FreeRTOS, STM32 & Motor Drives",
+          "description": "Microcontroller firmware architecture, FreeRTOS task scheduling, Rate Monotonic Analysis, STM32G4 dual-rate FOC loops, MISRA C:2012, and hardware watchdog design."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "7",
+        "title": "Real-Time Embedded Firmware: FreeRTOS, STM32 & Motor Drives",
+        "description": "Microcontroller firmware architecture, FreeRTOS task scheduling, Rate Monotonic Analysis, STM32G4 dual-rate FOC loops, MISRA C:2012, and hardware watchdog design.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 124,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 7,
+            "words": 50,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 6,
+            "words": 40,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 9,
+            "words": 47,
+            "flags": []
+          },
+          {
+            "lang": "c",
+            "lines": 9,
+            "words": 37,
+            "flags": []
+          },
+          {
+            "lang": "c",
+            "lines": 243,
+            "words": 1046,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 38,
+          "block_count": 5
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "10-8-system-integration-and-testing.mdx",
+        "module": "module10-hardware-architecture",
+        "total_words": 2813,
+        "prose_words": 862,
+        "frontmatter": {
+          "sidebar_position": "8",
+          "title": "System Integration, Bring-Up, Thermal Management & Reliability",
+          "description": "Whole-body bring-up sequencing, high-voltage bus pre-charge circuits, Safe Torque Off (STO), EMI/EMC shielding, thermal dissipation modeling, MTBF reliability, and automated ROS 2 diagnostics."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "8",
+        "title": "System Integration, Bring-Up, Thermal Management & Reliability",
+        "description": "Whole-body bring-up sequencing, high-voltage bus pre-charge circuits, Safe Torque Off (STO), EMI/EMC shielding, thermal dissipation modeling, MTBF reliability, and automated ROS 2 diagnostics.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 7,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 24,
+            "words": 162,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 11,
+            "words": 39,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 9,
+            "words": 51,
+            "flags": []
+          },
+          {
+            "lang": "",
+            "lines": 12,
+            "words": 75,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 5,
+            "words": 33,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 11,
+            "words": 94,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 190,
+            "words": 680,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 47,
+          "block_count": 10
+        },
+        "citations_count": 0
+      }
+    ],
+    "module11-safety-ethics": [
+      {
+        "filename": "11-1-robot-safety-standards.mdx",
+        "module": "module11-safety-ethics",
+        "total_words": 4850,
+        "prose_words": 2960,
+        "frontmatter": {
+          "sidebar_position": "1",
+          "title": "Global Robot Safety Standards: ISO 10218, ISO/TS 15066 & ISO 13849",
+          "description": "International regulatory frameworks for robotics, collaborative operation modes, biomechanical pain thresholds, Performance Levels (PL a-e), ANSI/RIA R15.08, and regulatory gap analysis for untethered bipedal humanoids."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "1",
+        "title": "Global Robot Safety Standards: ISO 10218, ISO/TS 15066 & ISO 13849",
+        "description": "International regulatory frameworks for robotics, collaborative operation modes, biomechanical pain thresholds, Performance Levels (PL a-e), ANSI/RIA R15.08, and regulatory gap analysis for untethered bipedal humanoids.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 20,
+            "words": 96,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 9,
+            "words": 53,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 16,
+            "words": 105,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 7,
+            "words": 77,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 3,
+            "words": 29,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 219,
+            "words": 1021,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 73,
+          "block_count": 14
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "11-2-functional-safety-architecture.mdx",
+        "module": "module11-safety-ethics",
+        "total_words": 3813,
+        "prose_words": 1123,
+        "frontmatter": {
+          "sidebar_position": "2",
+          "title": "Functional Safety Architecture: SIL Ratings, Redundancy & FMEA",
+          "description": "IEC 61508 Safety Integrity Levels (SIL 1-4), 1oo2 dual-channel voting architectures, safety microcontrollers, fail-safe states for humanoids, FMEA, and ROS 2 cross-monitoring."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "2",
+        "title": "Functional Safety Architecture: SIL Ratings, Redundancy & FMEA",
+        "description": "IEC 61508 Safety Integrity Levels (SIL 1-4), 1oo2 dual-channel voting architectures, safety microcontrollers, fail-safe states for humanoids, FMEA, and ROS 2 cross-monitoring.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 26,
+            "words": 101,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 8,
+            "words": 35,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 16,
+            "words": 73,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 6,
+            "words": 77,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 22,
+            "words": 70,
+            "flags": []
+          },
+          {
+            "lang": "cpp",
+            "lines": 203,
+            "words": 602,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 64,
+          "block_count": 12
+        },
+        "citations_count": 4
+      },
+      {
+        "filename": "11-3-human-robot-interaction-safety.mdx",
+        "module": "module11-safety-ethics",
+        "total_words": 3565,
+        "prose_words": 1756,
+        "frontmatter": {
+          "sidebar_position": "3",
+          "title": "Physical Human-Robot Interaction (pHRI) Safety & Collision Detection",
+          "description": "Sensorless collision detection via generalized momentum observers, active impedance control, post-impact reflex strategies, Hall's proxemics, and dual-channel E-stop architectures."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "3",
+        "title": "Physical Human-Robot Interaction (pHRI) Safety & Collision Detection",
+        "description": "Sensorless collision detection via generalized momentum observers, active impedance control, post-impact reflex strategies, Hall's proxemics, and dual-channel E-stop architectures.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 22,
+            "words": 104,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 9,
+            "words": 42,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 16,
+            "words": 77,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 12,
+            "words": 93,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 21,
+            "words": 85,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 188,
+            "words": 828,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 52,
+          "block_count": 22
+        },
+        "citations_count": 2
+      },
+      {
+        "filename": "11-4-ethics-of-autonomous-humanoids.mdx",
+        "module": "module11-safety-ethics",
+        "total_words": 3323,
+        "prose_words": 1163,
+        "frontmatter": {
+          "sidebar_position": "4",
+          "title": "Ethics of Autonomous Humanoids: Labor, Liability & Bias",
+          "description": "IEEE Ethically Aligned Design, macroeconomic labor displacement models, algorithmic bias in robot vision, legal liability apportionment, and regulatory frameworks (EU AI Act, US EO 14110)."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "4",
+        "title": "Ethics of Autonomous Humanoids: Labor, Liability & Bias",
+        "description": "IEEE Ethically Aligned Design, macroeconomic labor displacement models, algorithmic bias in robot vision, legal liability apportionment, and regulatory frameworks (EU AI Act, US EO 14110).",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 5,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 73,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 6,
+            "words": 43,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 67,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 10,
+            "words": 44,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 169,
+            "words": 824,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 26,
+          "block_count": 6
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "11-5-privacy-and-data-governance.mdx",
+        "module": "module11-safety-ethics",
+        "total_words": 3318,
+        "prose_words": 1611,
+        "frontmatter": {
+          "sidebar_position": "5",
+          "title": "Privacy Engineering & Data Governance for Embodied Agents",
+          "description": "Privacy-by-design for embodied robots, edge-only inference paradigms, differential privacy in federated robot learning, GDPR/CCPA compliance, and physical adversarial attack defenses."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "5",
+        "title": "Privacy Engineering & Data Governance for Embodied Agents",
+        "description": "Privacy-by-design for embodied robots, edge-only inference paradigms, differential privacy in federated robot learning, GDPR/CCPA compliance, and physical adversarial attack defenses.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 6,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 22,
+            "words": 96,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 12,
+            "words": 78,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 19,
+            "words": 93,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 57,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 8,
+            "words": 63,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 191,
+            "words": 746,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 36,
+          "block_count": 5
+        },
+        "citations_count": 2
+      },
+      {
+        "filename": "11-6-deployment-operations.mdx",
+        "module": "module11-safety-ethics",
+        "total_words": 3269,
+        "prose_words": 1809,
+        "frontmatter": {
+          "sidebar_position": "6",
+          "title": "Deployment Operations: Fleet Management, OTA Updates & Digital Shadows",
+          "description": "RoboOps fleet management, dual A/B partition OTA updates, canary rollout models, Prometheus/Grafana telemetry, incident response playbooks, CE/UL certification, and Agility Digit case study."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "6",
+        "title": "Deployment Operations: Fleet Management, OTA Updates & Digital Shadows",
+        "description": "RoboOps fleet management, dual A/B partition OTA updates, canary rollout models, Prometheus/Grafana telemetry, incident response playbooks, CE/UL certification, and Agility Digit case study.",
+        "components": {
+          "chapter_progress": false,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 7,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 21,
+            "words": 111,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 11,
+            "words": 50,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 5,
+            "words": 32,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 14,
+            "words": 66,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 7,
+            "words": 91,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 20,
+            "words": 83,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 184,
+            "words": 553,
+            "flags": [
+              "bare_pass"
+            ]
+          }
+        ],
+        "suspicious_code": [
+          {
+            "lang": "python",
+            "flags": [
+              "bare_pass"
+            ],
+            "snippet": "\"\"\"\nROS 2 Prometheus Metrics Exporter Node for Humanoid Fleet Telemetry\nStreams real-time actuator health, thermals, policy jitter, and safety stop counters\nto Prometheus / Grafana monitoring infrastr"
+          }
+        ],
+        "math": {
+          "inline_count": 26,
+          "block_count": 7
+        },
+        "citations_count": 0
+      }
+    ],
+    "module12-capstone-frontiers": [
+      {
+        "filename": "12-1-capstone-project-guide.mdx",
+        "module": "module12-capstone-frontiers",
+        "total_words": 3530,
+        "prose_words": 1838,
+        "frontmatter": {
+          "sidebar_position": "1",
+          "title": "Humanoid Robotics Capstone Projects: Comprehensive Guide",
+          "description": "Master architecture, end-to-end latency budgets, and rigorous evaluation rubrics for four graduate-level capstones spanning autonomous VLA manipulation, perceptive stair traversal, voice-commanded embodied assistants, and bilateral VR teleoperation."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "1",
+        "title": "Humanoid Robotics Capstone Projects: Comprehensive Guide",
+        "description": "Master architecture, end-to-end latency budgets, and rigorous evaluation rubrics for four graduate-level capstones spanning autonomous VLA manipulation, perceptive stair traversal, voice-commanded embodied assistants, and bilateral VR teleoperation.",
+        "components": {
+          "chapter_progress": true,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 3,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 35,
+            "words": 153,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 22,
+            "words": 92,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 309,
+            "words": 943,
+            "flags": [
+              "stub_function"
+            ]
+          }
+        ],
+        "suspicious_code": [
+          {
+            "lang": "python",
+            "flags": [
+              "stub_function"
+            ],
+            "snippet": "\"\"\"\nhumanoid_capstone_scaffold.py\n=============================================================================\nProduction-Grade Software Scaffold for Humanoid Capstone Projects.\nBridges:\n  1. FastAPI"
+          }
+        ],
+        "math": {
+          "inline_count": 34,
+          "block_count": 3
+        },
+        "citations_count": 4
+      },
+      {
+        "filename": "12-2-research-frontiers-locomotion.mdx",
+        "module": "module12-capstone-frontiers",
+        "total_words": 3178,
+        "prose_words": 1540,
+        "frontmatter": {
+          "sidebar_position": "2",
+          "title": "Research Frontiers in Locomotion: Parkour, Loco-Manipulation & Extreme Environments",
+          "description": "Explore the bleeding-edge frontiers of dynamic legged robotics: high-energy parkour, whole-body loco-manipulation, compliant soft actuators, wearable exoskeletons, extreme planetary humanoids, and the 20 open grand challenges in locomotion science."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "2",
+        "title": "Research Frontiers in Locomotion: Parkour, Loco-Manipulation & Extreme Environments",
+        "description": "Explore the bleeding-edge frontiers of dynamic legged robotics: high-energy parkour, whole-body loco-manipulation, compliant soft actuators, wearable exoskeletons, extreme planetary humanoids, and the 20 open grand challenges in locomotion science.",
+        "components": {
+          "chapter_progress": true,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 5,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 63,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 15,
+            "words": 68,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 71,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 7,
+            "words": 32,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 200,
+            "words": 812,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 47,
+          "block_count": 6
+        },
+        "citations_count": 12
+      },
+      {
+        "filename": "12-3-research-frontiers-ai.mdx",
+        "module": "module12-capstone-frontiers",
+        "total_words": 2885,
+        "prose_words": 1194,
+        "frontmatter": {
+          "sidebar_position": "3",
+          "title": "Research Frontiers in Physical AI: World Models, NeRFs & 3D Gaussian Splatting",
+          "description": "Delve into the cutting edge of physical artificial intelligence: generative world models, embodied foundation architectures, real-time 3D Gaussian Splatting for collision checking, and the 20 grand challenges in physical AI."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "3",
+        "title": "Research Frontiers in Physical AI: World Models, NeRFs & 3D Gaussian Splatting",
+        "description": "Delve into the cutting edge of physical artificial intelligence: generative world models, embodied foundation architectures, real-time 3D Gaussian Splatting for collision checking, and the 20 grand challenges in physical AI.",
+        "components": {
+          "chapter_progress": true,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 4,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 16,
+            "words": 82,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 14,
+            "words": 56,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 10,
+            "words": 49,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 157,
+            "words": 682,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 33,
+          "block_count": 9
+        },
+        "citations_count": 5
+      },
+      {
+        "filename": "12-4-the-future-of-humanoid-robotics.mdx",
+        "module": "module12-capstone-frontiers",
+        "total_words": 2773,
+        "prose_words": 1427,
+        "frontmatter": {
+          "sidebar_position": "4",
+          "title": "The Future of Humanoid Robotics: 2025\u20132030 Technology Roadmap",
+          "description": "A comprehensive strategic analysis of the 2025\u20132030 humanoid technology roadmap, industrial adoption waves, commercial ecosystem leaders, economic parity models, and empirical robotic scaling laws."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "4",
+        "title": "The Future of Humanoid Robotics: 2025\u20132030 Technology Roadmap",
+        "description": "A comprehensive strategic analysis of the 2025\u20132030 humanoid technology roadmap, industrial adoption waves, commercial ecosystem leaders, economic parity models, and empirical robotic scaling laws.",
+        "components": {
+          "chapter_progress": true,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 5,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 15,
+            "words": 134,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 24,
+            "words": 104,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 18,
+            "words": 84,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 12,
+            "words": 75,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 147,
+            "words": 603,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 40,
+          "block_count": 3
+        },
+        "citations_count": 2
+      },
+      {
+        "filename": "12-5-contributing-to-open-source.mdx",
+        "module": "module12-capstone-frontiers",
+        "total_words": 2320,
+        "prose_words": 1339,
+        "frontmatter": {
+          "sidebar_position": "5",
+          "title": "Contributing to Open-Source Robotics & Research Communities",
+          "description": "Master the open-source robotics ecosystem: contributing to ROS 2, Isaac Lab, and LeRobot, authoring premier robotics research papers for ICRA/IROS/RSS/CoRL, IP strategy, licensing, and automated CI/CD workflows."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "5",
+        "title": "Contributing to Open-Source Robotics & Research Communities",
+        "description": "Master the open-source robotics ecosystem: contributing to ROS 2, Isaac Lab, and LeRobot, authoring premier robotics research papers for ICRA/IROS/RSS/CoRL, IP strategy, licensing, and automated CI/CD workflows.",
+        "components": {
+          "chapter_progress": true,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 5,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 20,
+            "words": 114,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 13,
+            "words": 78,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 17,
+            "words": 74,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 7,
+            "words": 35,
+            "flags": []
+          },
+          {
+            "lang": "yaml",
+            "lines": 114,
+            "words": 320,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 14,
+          "block_count": 2
+        },
+        "citations_count": 0
+      },
+      {
+        "filename": "12-6-reference-and-bibliography.mdx",
+        "module": "module12-capstone-frontiers",
+        "total_words": 3090,
+        "prose_words": 1847,
+        "frontmatter": {
+          "sidebar_position": "6",
+          "title": "Definitive Annotated Bibliography & Reference Compendium",
+          "description": "A master compendium of 200+ seminal papers, foundational textbooks, premier graduate syllabi, open robotics dataset registries, hardware supplier directories, and an automated BibTeX search engine."
+        },
+        "frontmatter_valid": true,
+        "sidebar_position": "6",
+        "title": "Definitive Annotated Bibliography & Reference Compendium",
+        "description": "A master compendium of 200+ seminal papers, foundational textbooks, premier graduate syllabi, open robotics dataset registries, hardware supplier directories, and an automated BibTeX search engine.",
+        "components": {
+          "chapter_progress": true,
+          "quiz_engine": true,
+          "quiz_questions_parsed": 0,
+          "quiz_questions": []
+        },
+        "code_blocks_count": 3,
+        "code_blocks": [
+          {
+            "lang": "mermaid",
+            "lines": 39,
+            "words": 186,
+            "flags": []
+          },
+          {
+            "lang": "mermaid",
+            "lines": 9,
+            "words": 87,
+            "flags": []
+          },
+          {
+            "lang": "python",
+            "lines": 186,
+            "words": 664,
+            "flags": []
+          }
+        ],
+        "suspicious_code": [],
+        "math": {
+          "inline_count": 10,
+          "block_count": 0
+        },
+        "citations_count": 9
+      }
+    ]
+  }
+}
