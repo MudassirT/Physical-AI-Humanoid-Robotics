@@ -1,0 +1,8 @@
+{
+  "label": "Module 11: Safety, Ethics & Deployment",
+  "position": 11,
+  "link": {
+    "type": "generated-index",
+    "description": "Functional safety standards (ISO 10218, ISO/TS 15066, ISO 13849), SIL architectures, sensorless collision detection, embodied AI ethics, privacy engineering, and fleet deployment operations."
+  }
+}
