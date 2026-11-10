@@ -1,0 +1,8 @@
+{
+  "label": "Module 10: Hardware Architecture & Embedded Systems",
+  "position": 10,
+  "link": {
+    "type": "generated-index",
+    "description": "Mechatronic hardware design, high-torque actuators, FOC power electronics, real-time deterministic buses, heterogeneous edge compute, and sensor integration for physical humanoids."
+  }
+}
