@@ -254,10 +254,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .button--primary {
-  background: linear-gradient(135deg, #4338ca 0%, #6366f1 100%) !important;
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 60%, #06b6d4 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.18) !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.3);
+  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
 }
 
 .button--primary:hover {
