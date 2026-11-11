@@ -1,11 +1,11 @@
-import type { ReactNode } from 'react';
+import React, { useState, type ReactNode } from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
 import Link from '@docusaurus/Link';
 
 // ---------------------------------------------------------------------------
-// Module SVG Icons (Precision Vector)
+// Precision Vector Icons for All 12 Modules
 // ---------------------------------------------------------------------------
 
 function NervousSystemIcon() {
@@ -55,6 +55,88 @@ function VLAIcon() {
   );
 }
 
+function KinematicsIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="6" cy="6" r="3" />
+      <circle cx="18" cy="18" r="3" />
+      <circle cx="18" cy="6" r="2" />
+      <line x1="8.5" y1="7.5" x2="16" y2="16" />
+      <line x1="8" y1="6" x2="16" y2="6" />
+    </svg>
+  );
+}
+
+function LocomotionIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 22l4-8 4 3 4-9" />
+      <circle cx="17" cy="4" r="2" />
+      <path d="M14 10l5 3 2 7" />
+    </svg>
+  );
+}
+
+function ManipulationIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4" />
+      <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v7" />
+      <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+      <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+    </svg>
+  );
+}
+
+function LearningIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+      <circle cx="12" cy="12" r="3" />
+      <line x1="12" y1="9" x2="12" y2="3" />
+      <line x1="14.5" y1="13.5" x2="20" y2="16.5" />
+      <line x1="9.5" y1="13.5" x2="4" y2="16.5" />
+    </svg>
+  );
+}
+
+function SimToRealIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="7" cy="12" r="5" />
+      <circle cx="17" cy="12" r="5" strokeDasharray="3 3" />
+      <path d="M10 12h4" />
+      <path d="m12 10 2 2-2 2" />
+    </svg>
+  );
+}
+
+function HardwareIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  );
+}
+
+function SafetyIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
+function CapstoneIcon() {
+  return (
+    <svg className={styles.cardIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
 function BulletCheckIcon() {
   return (
     <svg className={styles.bulletCheck} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
@@ -80,6 +162,11 @@ function ArrowRightIcon() {
     </svg>
   );
 }
+
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Curriculum Data Model
+// ---------------------------------------------------------------------------
 
 type FeatureItem = {
   num: string;
