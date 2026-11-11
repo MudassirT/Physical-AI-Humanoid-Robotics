@@ -249,7 +249,7 @@ function HomepageHeader() {
         {/* Stats Strip */}
         <div className={styles.heroStats}>
           <div className={styles.heroStat}>
-            <span className={styles.heroStatNumber}>4</span>
+            <span className={styles.heroStatNumber}>12</span>
             <span className={styles.heroStatLabel}>Core Modules</span>
           </div>
           <div className={styles.heroStat}>
@@ -257,12 +257,12 @@ function HomepageHeader() {
             <span className={styles.heroStatLabel}>In-Depth Chapters</span>
           </div>
           <div className={styles.heroStat}>
-            <span className={styles.heroStatNumber}>RAG</span>
-            <span className={styles.heroStatLabel}>Vector AI Tutor</span>
+            <span className={styles.heroStatNumber}>1 kHz</span>
+            <span className={styles.heroStatLabel}>Real-Time RT Loop</span>
           </div>
           <div className={styles.heroStat}>
             <span className={styles.heroStatNumber}>100%</span>
-            <span className={styles.heroStatLabel}>Open Access</span>
+            <span className={styles.heroStatLabel}>RAG Grounded AI</span>
           </div>
         </div>
       </div>
