@@ -28,6 +28,8 @@ const SUGGESTED_PROMPTS: SuggestedPrompt[] = [
   { topic: 'Module 2 • Simulation', query: 'How do Gazebo and Unity simulate Digital Twins and multi-contact dynamics?' },
   { topic: 'Module 3 • Isaac ROS', query: 'How does NVIDIA Isaac ROS cuVSLAM compute visual-inertial odometry?' },
   { topic: 'Module 4 • VLA Models', query: 'How do Vision-Language-Action (VLA) foundation models bridge voice commands to joint trajectories?' },
+  { topic: 'Module 6 • Locomotion', query: 'Explain 3D-LIPM and Kajita ZMP preview control for stable bipedal walking.' },
+  { topic: 'Module 8 • Robot Learning', query: 'How does Isaac Gym perform massively parallel reinforcement learning with PPO?' },
 ];
 
 // ---------------------------------------------------------------------------
