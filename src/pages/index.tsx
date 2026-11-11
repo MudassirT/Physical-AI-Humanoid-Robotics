@@ -10,35 +10,14 @@ import ChatWidget from '@site/src/components/ChatWidget/ChatWidget';
 import styles from './index.module.css';
 
 // ---------------------------------------------------------------------------
-// SVG Icons (Precision Vector)
+// Precision Vector Icons
 // ---------------------------------------------------------------------------
-
-function RobotHeadIcon() {
-  return (
-    <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <rect x="3" y="11" width="18" height="10" rx="2" />
-      <circle cx="12" cy="5" r="2" />
-      <path d="M12 7v4" />
-      <line x1="8" y1="16" x2="8" y2="16" />
-      <line x1="16" y1="16" x2="16" y2="16" />
-    </svg>
-  );
-}
 
 function ArrowRightIcon() {
   return (
     <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M5 12h14" />
       <path d="m12 5 7 7-7 7" />
-    </svg>
-  );
-}
-
-function TerminalIcon() {
-  return (
-    <svg className={styles.terminalIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <polyline points="4 17 10 11 4 5" />
-      <line x1="12" y1="19" x2="20" y2="19" />
     </svg>
   );
 }
@@ -81,6 +60,18 @@ function BrainAIIcon() {
   );
 }
 
+function RobotHeadIcon() {
+  return (
+    <svg className={styles.btnIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="11" width="18" height="10" rx="2" />
+      <circle cx="12" cy="5" r="2" />
+      <path d="M12 7v4" />
+      <line x1="8" y1="16" x2="8" y2="16" />
+      <line x1="16" y1="16" x2="16" y2="16" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Interactive Robotics Telemetry Showcase
 // ---------------------------------------------------------------------------
@@ -89,13 +80,13 @@ const SHOWCASE_TABS = [
   {
     id: 'ros2',
     label: 'ROS 2 Middleware',
-    badge: '1 kHz Loop',
+    badge: '1 kHz RT Loop',
     code: `// ros2_control Real-Time Joint Commutation (Module 1)
 auto qos = rclcpp::QoS(10).reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE)
                          .durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
 joint_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
     "/humanoid/joint_states", qos);
-// Zero-copy Shared Memory transport enabled via Iceoryx`,
+// Zero-copy Shared Memory transport enabled via Eclipse Iceoryx`,
   },
   {
     id: 'sim',
@@ -214,7 +205,7 @@ function HomepageHeader() {
         {/* Subtitle */}
         <p className={clsx('hero__subtitle', styles.heroSubtitle)}>
           Master low-latency ROS 2 middleware, physics-accurate Digital Twins, NVIDIA Isaac perception,
-          and Vision-Language-Action foundation models for bipedal humanoid robots.
+          and Vision-Language-Action (VLA) foundation models for autonomous bipedal humanoids.
         </p>
 
         {/* Action Buttons */}
@@ -281,7 +272,7 @@ function HowItWorks() {
       num: 1,
       title: 'Deterministic Middleware',
       desc: 'Architect low-latency ROS 2 nodes, zero-copy shared memory IPC (Iceoryx), and DDS QoS policies for 1 kHz motor control loops.',
-      tag: 'Module 1 • ROS 2',
+      tag: 'Phase 1 • ROS 2 Core',
       link: '/ai-book/module1-ros2/1-1-introduction',
     },
     {
@@ -289,7 +280,7 @@ function HowItWorks() {
       num: 2,
       title: 'Physics & Digital Twins',
       desc: 'Construct kinematic URDF/SDF models in Gazebo Harmonic with multi-contact friction, and render photorealistic sensors in Unity HDRP.',
-      tag: 'Module 2 • Simulation',
+      tag: 'Phase 1 • Simulation',
       link: '/ai-book/module2-digital-twin/2-1-introduction-to-digital-twins',
     },
     {
@@ -297,7 +288,7 @@ function HowItWorks() {
       num: 3,
       title: 'Accelerated Perception & SLAM',
       desc: 'Deploy GPU-accelerated cuVSLAM odometry, TensorRT inference, and Nav2 bipedal footstep lattice planning in NVIDIA Isaac Sim.',
-      tag: 'Module 3 • Isaac Platform',
+      tag: 'Phase 2 • Isaac Platform',
       link: '/ai-book/module3-ai-robot-brain/3-1-introduction-to-isaac-platform',
     },
     {
@@ -305,7 +296,7 @@ function HowItWorks() {
       num: 4,
       title: 'Embodied Vision-Language-Action',
       desc: 'Ground multimodal foundation models (OpenVLA, π0) to physical actions with voice-to-action translation and cognitive planners.',
-      tag: 'Module 4 • VLA Models',
+      tag: 'Phase 2 • VLA Models',
       link: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
     },
   ];
@@ -353,8 +344,9 @@ function HowItWorks() {
             <span className={styles.techPill}>NVIDIA Isaac Sim 4.0</span>
             <span className={styles.techPill}>cuVSLAM & Nav2</span>
             <span className={styles.techPill}>OpenVLA & π0</span>
+            <span className={styles.techPill}>Kajita 3D-LIPM</span>
             <span className={styles.techPill}>Qdrant Vector DB</span>
-            <span className={styles.techPill}>FastAPI</span>
+            <span className={styles.techPill}>FastAPI Backend</span>
           </div>
         </div>
       </div>
@@ -373,7 +365,7 @@ export default function Home(): ReactNode {
       description="The definitive open-access guide to Physical AI, ROS 2, Digital Twins, NVIDIA Isaac, and Vision-Language-Action systems.">
       <HomepageHeader />
       <main>
-        {/* 4 Curriculum Modules */}
+        {/* All 12 Curriculum Modules */}
         <HomepageFeatures />
 
         {/* Systematic Engineering Roadmap */}
