@@ -168,7 +168,10 @@ function ArrowRightIcon() {
 // Curriculum Data Model
 // ---------------------------------------------------------------------------
 
+type ModuleCategory = 'all' | 'foundations' | 'embodied' | 'learning' | 'systems';
+
 type FeatureItem = {
+  category: ModuleCategory;
   num: string;
   themeClass: string;
   level: string;
@@ -183,6 +186,7 @@ type FeatureItem = {
 const FeatureList: FeatureItem[] = [
   {
     num: '01',
+    category: 'foundations',
     themeClass: styles.modTheme1,
     level: 'LEVEL 1 • MIDDLEWARE',
     duration: '3.5 Hrs',
@@ -199,6 +203,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     num: '02',
+    category: 'foundations',
     themeClass: styles.modTheme2,
     level: 'LEVEL 2 • SIMULATION',
     duration: '4.0 Hrs',
@@ -215,6 +220,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     num: '03',
+    category: 'foundations',
     themeClass: styles.modTheme3,
     level: 'LEVEL 3 • PERCEPTION',
     duration: '4.5 Hrs',
@@ -231,6 +237,7 @@ const FeatureList: FeatureItem[] = [
   },
   {
     num: '04',
+    category: 'embodied',
     themeClass: styles.modTheme4,
     level: 'LEVEL 4 • EMBODIED COGNITION',
     duration: '5.0 Hrs',
