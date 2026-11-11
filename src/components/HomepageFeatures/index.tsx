@@ -164,15 +164,14 @@ function ArrowRightIcon() {
 }
 
 // ---------------------------------------------------------------------------
-// ---------------------------------------------------------------------------
-// Curriculum Data Model
+// Curriculum Data Model — All 12 Modules
 // ---------------------------------------------------------------------------
 
 type ModuleCategory = 'all' | 'foundations' | 'embodied' | 'learning' | 'systems';
 
 type FeatureItem = {
-  category: ModuleCategory;
   num: string;
+  category: ModuleCategory;
   themeClass: string;
   level: string;
   duration: string;
@@ -192,12 +191,7 @@ const FeatureList: FeatureItem[] = [
     duration: '3.5 Hrs',
     icon: <NervousSystemIcon />,
     title: 'The Robotic Nervous System (ROS 2)',
-    description: (
-      <>
-        Master the deterministic middleware layer, DDS QoS policies, real-time lifecycle nodes,
-        and zero-copy IPC designed for sub-millisecond humanoid joint motor commutation.
-      </>
-    ),
+    description: 'Master the deterministic middleware layer, DDS QoS policies, real-time lifecycle nodes, and zero-copy IPC designed for sub-millisecond humanoid joint motor commutation.',
     bullets: ['Deterministic DDS & QoS Policies', 'Iceoryx Shared Memory IPC', 'Services, Actions & Parameters', 'rclpy & rclcpp Architecture'],
     to: '/ai-book/module1-ros2/1-1-introduction',
   },
@@ -209,12 +203,7 @@ const FeatureList: FeatureItem[] = [
     duration: '4.0 Hrs',
     icon: <DigitalTwinIcon />,
     title: 'The Digital Twin (Gazebo & Unity)',
-    description: (
-      <>
-        Build high-fidelity physics replicas in Gazebo Harmonic and photorealistic sensor rendering
-        in Unity HDRP to close the sim-to-real gap before deploying to physical robot hardware.
-      </>
-    ),
+    description: 'Build high-fidelity physics replicas in Gazebo Harmonic and photorealistic sensor rendering in Unity HDRP to close the sim-to-real gap before deploying to physical robot hardware.',
     bullets: ['Rigid-Body & Multi-Contact Physics', 'URDF, Xacro & SDF Modeling', 'IMU & Stereo Camera Sensor Sim', 'Unity Robotics Hub & ROS TCP'],
     to: '/ai-book/module2-digital-twin/2-1-introduction-to-digital-twins',
   },
@@ -226,12 +215,7 @@ const FeatureList: FeatureItem[] = [
     duration: '4.5 Hrs',
     icon: <RobotBrainIcon />,
     title: 'The AI-Robot Brain (NVIDIA Isaac)',
-    description: (
-      <>
-        Harness GPU-accelerated Isaac ROS, TensorRT perception pipelines, photorealistic synthetic
-        data generation in Isaac Sim, and Nav2 footstep lattice planning for bipedal traversal.
-      </>
-    ),
+    description: 'Harness GPU-accelerated Isaac ROS, TensorRT perception pipelines, photorealistic synthetic data generation in Isaac Sim, and Nav2 footstep lattice planning for bipedal traversal.',
     bullets: ['Isaac Sim & Synthetic Data Generation', 'NITROS Zero-Copy Pipelines', 'cuVSLAM Visual-Inertial Odometry', 'Nav2 Bipedal Footstep Lattice'],
     to: '/ai-book/module3-ai-robot-brain/3-1-introduction-to-isaac-platform',
   },
@@ -242,13 +226,8 @@ const FeatureList: FeatureItem[] = [
     level: 'LEVEL 4 • EMBODIED COGNITION',
     duration: '5.0 Hrs',
     icon: <VLAIcon />,
-    title: 'Vision-Language-Action (VLA)',
-    description: (
-      <>
-        Bridge natural language intent to embodied robotic actions. Integrate multimodal foundation
-        models, Whisper voice pipelines, and LLM hierarchical planners for autonomous humanoid tasks.
-      </>
-    ),
+    title: 'Vision-Language-Action (VLA) Systems',
+    description: 'Bridge natural language intent to embodied robotic actions. Integrate multimodal foundation models, Whisper voice pipelines, and LLM hierarchical planners for autonomous humanoid tasks.',
     bullets: ['End-to-End VLA Architectures (OpenVLA)', 'Whisper Voice-to-Action Pipeline', 'LLM Hierarchical Cognitive Planning', '3D Affordance & Spatial Grounding'],
     to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
   },
@@ -352,7 +331,7 @@ const FeatureList: FeatureItem[] = [
 
 function Feature({ num, themeClass, level, duration, icon, title, description, bullets, to }: FeatureItem) {
   return (
-    <div className={clsx('col col--6', styles.featureCol)}>
+    <div className={clsx('col col--6 col--lg-4', styles.featureCol)}>
       <div className={clsx(styles.card, themeClass)}>
         {/* Top Meta Bar */}
         <div className={styles.cardHeader}>
@@ -399,25 +378,72 @@ function Feature({ num, themeClass, level, duration, icon, title, description, b
 }
 
 export default function HomepageFeatures(): ReactNode {
+  const [selectedCategory, setSelectedCategory] = useState<ModuleCategory>('all');
+
+  const filteredFeatures = selectedCategory === 'all'
+    ? FeatureList
+    : FeatureList.filter((item) => item.category === selectedCategory);
+
   return (
     <section id="curriculum-modules" className={styles.features}>
       <div className="container">
         {/* Section Pill */}
-        <div className={styles.sectionBadge}>
-          <span className={styles.sectionBadgeDot} />
-          SYSTEMATIC ENGINEERING CURRICULUM
+        <div className={styles.sectionBadgeWrapper}>
+          <div className={styles.sectionBadge}>
+            <span className={styles.sectionBadgeDot} />
+            12-MODULE EMBODIED AI CURRICULUM
+          </div>
         </div>
 
         <Heading as="h2" className={styles.sectionTitle}>
-          Four Pillars of Embodied Intelligence
+          Comprehensive Physical AI Engineering Pathway
         </Heading>
         <p className={styles.sectionSubtitle}>
-          An end-to-end engineering journey transitioning your capabilities from low-level deterministic motor communication to autonomous multimodal humanoid behavior.
+          An end-to-end engineering journey transitioning your capabilities from sub-millisecond motor communication to autonomous multimodal humanoid behavior.
         </p>
 
+        {/* Category Filter Pills */}
+        <div className={styles.categoryFilterBar}>
+          <button
+            type="button"
+            className={clsx(styles.filterBtn, selectedCategory === 'all' && styles.filterBtnActive)}
+            onClick={() => setSelectedCategory('all')}
+          >
+            All 12 Modules
+          </button>
+          <button
+            type="button"
+            className={clsx(styles.filterBtn, selectedCategory === 'foundations' && styles.filterBtnActive)}
+            onClick={() => setSelectedCategory('foundations')}
+          >
+            Phase 1: Foundations & Sim (1–3)
+          </button>
+          <button
+            type="button"
+            className={clsx(styles.filterBtn, selectedCategory === 'embodied' && styles.filterBtnActive)}
+            onClick={() => setSelectedCategory('embodied')}
+          >
+            Phase 2: Embodied AI & VLA (4–6)
+          </button>
+          <button
+            type="button"
+            className={clsx(styles.filterBtn, selectedCategory === 'learning' && styles.filterBtnActive)}
+            onClick={() => setSelectedCategory('learning')}
+          >
+            Phase 3: Dynamics & Learning (7–9)
+          </button>
+          <button
+            type="button"
+            className={clsx(styles.filterBtn, selectedCategory === 'systems' && styles.filterBtnActive)}
+            onClick={() => setSelectedCategory('systems')}
+          >
+            Phase 4: Hardware & Frontiers (10–12)
+          </button>
+        </div>
+
         <div className="row">
-          {FeatureList.map((props, idx) => (
-            <Feature key={idx} {...props} />
+          {filteredFeatures.map((props) => (
+            <Feature key={props.num} {...props} />
           ))}
         </div>
       </div>
