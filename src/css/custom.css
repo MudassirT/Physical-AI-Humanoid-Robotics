@@ -25,6 +25,20 @@
   --ifm-color-secondary-lightest: #f0f9ff;
 
   --ifm-color-accent: #8b5cf6;
+  --ifm-color-cyan: #06b6d4;
+  --ifm-color-primary-dark: #3730a3;
+  --ifm-color-primary-darker: #312e81;
+  --ifm-color-primary-darkest: #1e1b4b;
+  --ifm-color-primary-light: #4f46e5;
+  --ifm-color-primary-lighter: #6366f1;
+  --ifm-color-primary-lightest: #eef2ff;
+
+  --ifm-color-secondary: #0284c7;
+  --ifm-color-secondary-dark: #0369a1;
+  --ifm-color-secondary-light: #0ea5e9;
+  --ifm-color-secondary-lightest: #f0f9ff;
+
+  --ifm-color-accent: #8b5cf6;
   --ifm-color-success: #10b981;
   --ifm-color-warning: #f59e0b;
   --ifm-color-danger: #ef4444;
@@ -85,7 +99,9 @@
   --ifm-color-primary-lighter: #a5b4fc;
   --ifm-color-primary-lightest: #1e1b4b;
 
-  --ifm-background-color: #07090e;
+  --ifm-background-color: #05070d;
+  --ifm-background-surface-color: #0a0d18;
+  --surface-elevated: #0f1424;
   --ifm-background-surface-color: #0c0f1a;
   --surface-elevated: #111524;
   --surface-border: rgba(255, 255, 255, 0.09);
