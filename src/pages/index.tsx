@@ -144,6 +144,7 @@ function RoboticsShowcase() {
           <span className={styles.dotRed} />
           <span className={styles.dotYellow} />
           <span className={styles.dotGreen} />
+          <span className={styles.terminalLabel}>telemetry.ros2_node.cpp</span>
         </div>
         <div className={styles.showcaseTabs}>
           {SHOWCASE_TABS.map((tab, idx) => (
@@ -167,7 +168,7 @@ function RoboticsShowcase() {
       <div className={styles.showcaseFooter}>
         <div className={styles.showcaseStatus}>
           <span className={styles.statusGlow} />
-          <span>Telemetry: 1000 Hz Hard Real-Time • End-to-End VLA Grounded</span>
+          <span>Loop Latency: 0.38 ms • Zero-Copy Iceoryx • Jitter: ±0.03 ms • NOMINAL</span>
         </div>
         <Link to="/ai-book/intro" className={styles.showcaseExploreLink}>
           View Architecture Docs →
