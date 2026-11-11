@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.4.0] - 2026-11-11
+
+### Added
+- **Professional Cybernetic Vector Logo**: Bespoke aerospace-grade SVG brand identity featuring humanoid cranium, stereoscopic perception visor, quantum core, and bipedal chevrons (`static/img/physical-ai-robotics-logo.svg`).
+- **High-Visibility Vector Favicon**: Crisp cyber hex favicon optimized for both dark and light browser tabs (`static/img/favicon.svg`).
+- **Complete 12-Module Homepage Matrix**: Expanded curriculum showcase to feature all 12 modules with category filter tabs (Foundations, Embodied AI, Dynamics, Systems) in `src/components/HomepageFeatures`.
+- **Interactive Telemetry Showcase Upgrade**: Live simulated real-time metrics (0.38 ms loop latency, zero-copy shared memory) and VLA whole-body control code snippets.
+
+### Changed
+- **Comprehensive UI Overhaul**: Glassmorphic frosted navbar, ambient dynamic glow blooms, high-contrast syntax tokens, and micro-interactions.
+- **AI Tutor Suggestions**: Expanded quick prompt chips across kinematics, bipedal locomotion, and massively parallel reinforcement learning.
+
+---
+
 ## [2.3.0] - 2026-11-08
 
 ### Added
@@ -82,4 +96,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project architecture and Docusaurus v3 setup.
 - Basic FastAPI backend skeleton with vector retriever services.
 - Initial ROS 2 middleware chapters and core concepts documentation.
-
