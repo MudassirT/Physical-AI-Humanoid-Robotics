@@ -182,11 +182,15 @@ function HomepageHeader() {
 
   return (
     <header className={clsx('hero hero--primary', styles.heroBanner)}>
+      {/* Dynamic Ambient Background Glow Elements */}
+      <div className={styles.ambientGlowOrb1} />
+      <div className={styles.ambientGlowOrb2} />
+
       <div className="container">
         {/* Announcement Pill Badge */}
         <div className={styles.heroBadge}>
           <span className={styles.heroBadgeDot} />
-          <span>Physical AI & Humanoid Robotics • Comprehensive Curriculum</span>
+          <span>Next-Gen Embodied Intelligence • 12 Industry-Grade Modules • Open Access</span>
         </div>
 
         {/* Title */}
