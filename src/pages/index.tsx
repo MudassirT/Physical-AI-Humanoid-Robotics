@@ -124,13 +124,13 @@ cuvslam_node = ComposableNode(
   },
   {
     id: 'vla',
-    label: 'VLA Action Policies',
+    label: 'VLA & Whole-Body Control',
     badge: 'Octo & OpenVLA',
     code: `# Multimodal Voice-to-Action Chunking (Module 4)
 voice_instruction = whisper.transcribe(audio_stream) # "Clear the obstacle"
 prompt = f"Incline: 12 deg. Obstacle at x=1.4m. Intent: {voice_instruction}"
 action_chunk = vla_model.predict(rgb_front, prompt, horizon=16)
-# Publish continuous 50 Hz trajectory to Nav2 lattice planner`,
+# Publish continuous 50 Hz trajectory to Nav2 & Kajita 3D-LIPM planner`,
   },
 ];
 
