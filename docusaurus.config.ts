@@ -284,8 +284,8 @@ const config: Config = {
         alt: 'Physical AI Humanoid Robotics Logo',
         src: 'img/physical-ai-robotics-logo.svg',
         srcDark: 'img/physical-ai-robotics-logo.svg',
-        width: 34,
-        height: 34,
+        width: 36,
+        height: 36,
       },
       items: [
         {
@@ -297,7 +297,7 @@ const config: Config = {
         },
         {
           type: 'dropdown',
-          label: 'Modules',
+          label: 'Modules (1–12)',
           position: 'left',
           items: [
             {
