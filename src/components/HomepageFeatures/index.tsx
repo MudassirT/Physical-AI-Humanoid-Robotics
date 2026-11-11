@@ -252,6 +252,30 @@ const FeatureList: FeatureItem[] = [
     bullets: ['End-to-End VLA Architectures (OpenVLA)', 'Whisper Voice-to-Action Pipeline', 'LLM Hierarchical Cognitive Planning', '3D Affordance & Spatial Grounding'],
     to: '/ai-book/module4-vla/4-1-introduction-to-vla-systems',
   },
+  {
+    num: '05',
+    category: 'embodied',
+    themeClass: styles.modTheme5,
+    level: 'LEVEL 5 • KINEMATICS & DYNAMICS',
+    duration: '4.0 Hrs',
+    icon: <KinematicsIcon />,
+    title: 'Humanoid Kinematics & Dynamics',
+    description: 'Formulate Lie group kinematics using Product of Exponentials (PoE), solve redundant inverse kinematics via null-space projection, and implement Featherstone O(n) recursive dynamics.',
+    bullets: ['Product of Exponentials (PoE) & Lie Groups', 'Null-Space Redundancy Resolution', 'Featherstone Recursive Newton-Euler', 'Articulated Body Algorithm O(n)'],
+    to: '/ai-book/module5-kinematics-dynamics/5-1-introduction-to-robot-kinematics',
+  },
+  {
+    num: '06',
+    category: 'embodied',
+    themeClass: styles.modTheme6,
+    level: 'LEVEL 6 • BIPEDAL LOCOMOTION',
+    duration: '4.5 Hrs',
+    icon: <LocomotionIcon />,
+    title: 'Bipedal Locomotion & Whole-Body Control',
+    description: 'Engineer dynamic humanoid walking cycles with the 3D Linear Inverted Pendulum Model (3D-LIPM), Kajita ZMP preview control, Divergent Component of Motion (DCM), and QP whole-body controllers.',
+    bullets: ['3D-LIPM & Kajita ZMP Preview Control', 'Capture Point & DCM Footstep Adjustment', 'Quadratic Programming (QP) Whole-Body Control', 'Contact Wrenches & Foot Force Sensors'],
+    to: '/ai-book/module6-bipedal-locomotion/6-1-introduction-to-bipedal-locomotion',
+  },
 ];
 
 function Feature({ num, themeClass, level, duration, icon, title, description, bullets, to }: FeatureItem) {
