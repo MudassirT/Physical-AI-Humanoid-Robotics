@@ -547,22 +547,22 @@ div[class*='announcementBar'] button[class*='close']:hover {
 
 .table-of-contents {
   border-left: none !important;
-  padding: 1.25rem 0 1.25rem 1rem !important;
-  font-size: 0.84rem !important;
+  padding: 1.5rem 0 1.5rem 1.25rem !important;
+  font-size: 0.85rem !important;
 }
 
 .table-of-contents__link {
   color: var(--ifm-font-color-secondary) !important;
   font-weight: 500;
   transition: all var(--transition-fast);
-  line-height: 1.5;
+  line-height: 1.6;
   display: block;
-  padding: 0.25rem 0;
+  padding: 0.3rem 0;
 }
 
 .table-of-contents__link:hover {
   color: var(--ifm-color-primary) !important;
-  padding-left: 0.35rem;
+  padding-left: 0.4rem;
 }
 
 .table-of-contents__link--active {
@@ -579,19 +579,20 @@ div[class*='announcementBar'] button[class*='close']:hover {
    BREADCRUMBS
    ============================================================ */
 .breadcrumbs {
-  margin-bottom: 1.75rem !important;
-  padding: 0.4rem 0.85rem !important;
+  margin-bottom: 2rem !important;
+  padding: 0.45rem 1rem !important;
   background: var(--ifm-background-surface-color) !important;
   border: 1px solid var(--surface-border) !important;
   border-radius: var(--radius-full) !important;
   display: inline-flex !important;
-  font-size: 0.82rem !important;
+  font-size: 0.84rem !important;
   font-weight: 550 !important;
 }
 
 [data-theme='dark'] .breadcrumbs {
-  background: #0f1322 !important;
+  background: rgba(15, 23, 42, 0.75) !important;
   border-color: rgba(255, 255, 255, 0.08) !important;
+  backdrop-filter: blur(12px);
 }
 
 .breadcrumbs__link {
@@ -613,65 +614,67 @@ div[class*='announcementBar'] button[class*='close']:hover {
    ARTICLE TYPOGRAPHY & MARKDOWN CONTENT
    ============================================================ */
 .theme-doc-markdown {
-  font-size: 1.05rem;
-  line-height: 1.75;
+  font-size: 1.06rem;
+  line-height: 1.8;
   color: var(--ifm-font-color-base);
 }
 
 .theme-doc-markdown h1:first-child {
-  font-size: clamp(2.2rem, 4vw, 3.2rem) !important;
+  font-family: var(--ifm-heading-font-family) !important;
+  font-size: clamp(2.4rem, 4.5vw, 3.4rem) !important;
   font-weight: 850 !important;
   letter-spacing: -0.04em !important;
   line-height: 1.15 !important;
-  margin-bottom: 1.75rem !important;
-  background: linear-gradient(135deg, #0f172a 30%, #4338ca 100%);
+  margin-bottom: 2rem !important;
+  background: linear-gradient(135deg, #0f172a 20%, #334155 70%, #4338ca 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 [data-theme='dark'] .theme-doc-markdown h1:first-child {
-  background: linear-gradient(135deg, #ffffff 40%, #cbd5e1 80%, #818cf8 100%);
+  background: linear-gradient(135deg, #ffffff 30%, #e2e8f0 70%, #818cf8 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .theme-doc-markdown h2 {
-  font-size: 1.75rem !important;
+  font-size: 1.85rem !important;
   font-weight: 800 !important;
   letter-spacing: -0.03em !important;
-  margin-top: 3.5rem !important;
-  margin-bottom: 1rem !important;
-  padding-bottom: 0.6rem !important;
+  margin-top: 3.75rem !important;
+  margin-bottom: 1.15rem !important;
+  padding-bottom: 0.65rem !important;
   border-bottom: 1px solid var(--surface-border) !important;
 }
 
 .theme-doc-markdown h3 {
-  font-size: 1.35rem !important;
+  font-size: 1.4rem !important;
   font-weight: 750 !important;
-  letter-spacing: -0.02em !important;
-  margin-top: 2.25rem !important;
-  margin-bottom: 0.85rem !important;
+  letter-spacing: -0.025em !important;
+  margin-top: 2.5rem !important;
+  margin-bottom: 0.95rem !important;
 }
 
 .theme-doc-markdown p {
-  margin-bottom: 1.35rem;
+  margin-bottom: 1.4rem;
   color: var(--ifm-font-color-base);
 }
 
 .theme-doc-markdown blockquote {
-  border-left: 3.5px solid var(--ifm-color-primary);
+  border-left: 4px solid var(--ifm-color-primary);
   background: var(--ifm-background-surface-color);
-  padding: 1.1rem 1.5rem;
+  padding: 1.25rem 1.6rem;
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  margin: 1.75rem 0;
+  margin: 2rem 0;
   font-style: italic;
   color: var(--ifm-font-color-secondary);
+  box-shadow: var(--shadow-subtle);
 }
 
 [data-theme='dark'] .theme-doc-markdown blockquote {
-  background: #0f1424;
+  background: rgba(15, 23, 42, 0.7);
   border-left-color: #818cf8;
 }
 
@@ -684,31 +687,31 @@ div[class*='announcementBar'] button[class*='close']:hover {
   border-collapse: separate !important;
   border-spacing: 0 !important;
   border: 1px solid var(--surface-border) !important;
-  border-radius: var(--radius-md) !important;
+  border-radius: var(--radius-lg) !important;
   overflow: hidden !important;
-  margin: 2rem 0 !important;
+  margin: 2.25rem 0 !important;
   box-shadow: var(--shadow-subtle) !important;
 }
 
 .theme-doc-markdown th {
   background: var(--ifm-background-surface-color) !important;
   color: var(--ifm-font-color-base) !important;
-  font-weight: 700 !important;
+  font-weight: 750 !important;
   font-size: 0.84rem !important;
   text-transform: uppercase !important;
   letter-spacing: 0.05em !important;
-  padding: 0.9rem 1.1rem !important;
+  padding: 1rem 1.25rem !important;
   border-bottom: 1px solid var(--surface-border) !important;
 }
 
 [data-theme='dark'] .theme-doc-markdown th {
-  background: #111524 !important;
+  background: #0d1322 !important;
 }
 
 .theme-doc-markdown td {
-  padding: 0.85rem 1.1rem !important;
+  padding: 0.95rem 1.25rem !important;
   border-bottom: 1px solid var(--surface-border) !important;
-  font-size: 0.92rem !important;
+  font-size: 0.93rem !important;
   color: var(--ifm-font-color-secondary) !important;
 }
 
@@ -717,11 +720,11 @@ div[class*='announcementBar'] button[class*='close']:hover {
 }
 
 .theme-doc-markdown tr:hover td {
-  background: rgba(99, 102, 241, 0.04) !important;
+  background: rgba(99, 102, 241, 0.05) !important;
 }
 
 [data-theme='dark'] .theme-doc-markdown tr:hover td {
-  background: rgba(99, 102, 241, 0.08) !important;
+  background: rgba(99, 102, 241, 0.1) !important;
 }
 
 /* ============================================================
