@@ -186,6 +186,47 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================================
+   ANNOUNCEMENT BAR — Luminous Cyber Ribbon
+   ============================================================ */
+div[class*='announcementBar'] {
+  background: linear-gradient(90deg, #1e1b4b 0%, #312e81 35%, #0f766e 70%, #0369a1 100%) !important;
+  color: #ffffff !important;
+  font-size: 0.86rem !important;
+  font-weight: 600 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+div[class*='announcementBar'] a {
+  color: #38bdf8 !important;
+  font-weight: 750 !important;
+  text-decoration: none !important;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(56, 189, 248, 0.15);
+  margin-left: 0.35rem;
+  transition: all 160ms ease;
+  display: inline-flex;
+  align-items: center;
+}
+
+div[class*='announcementBar'] a:hover {
+  background: rgba(56, 189, 248, 0.3);
+  color: #ffffff !important;
+  transform: translateX(2px);
+}
+
+div[class*='announcementBar'] button[class*='close'] {
+  color: #ffffff !important;
+  opacity: 0.8;
+  transition: opacity 150ms ease;
+}
+
+div[class*='announcementBar'] button[class*='close']:hover {
+  opacity: 1;
+}
+
+/* ============================================================
    NAVBAR — Liquid Glass Master Chrome
    ============================================================ */
 .navbar {
