@@ -1,6 +1,10 @@
+/* =============================================================================
+   ColorModeToggle — Ultra Pro Max Theme Switcher
+   ============================================================================= */
+
 .toggle {
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11,23 +15,28 @@
   align-items: center;
   display: flex;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
   border-radius: 50%;
-  background: transparent;
-  border: 1px solid transparent;
+  background: var(--surface-elevated, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.12));
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+  transition: all 220ms cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  box-shadow: var(--shadow-subtle);
+  position: relative;
+  overflow: hidden;
 }
 
 .toggleButton:hover {
-  background: var(--ifm-color-emphasis-200);
-  border-color: var(--surface-border, rgba(255, 255, 255, 0.1));
+  background: rgba(99, 102, 241, 0.12);
+  border-color: rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px) rotate(15deg);
+  box-shadow: 0 0 16px rgba(99, 102, 241, 0.35);
 }
 
 .toggleButton:active {
-  transform: scale(0.88);
+  transform: scale(0.9) rotate(30deg);
 }
 
 .toggleIcon {
@@ -35,12 +44,14 @@
   width: 1.25rem;
   height: 1.25rem;
   pointer-events: none;
+  transition: transform 250ms ease;
 }
 
 /* Light Mode active: display sun / light toggle icon */
 :global([data-theme='light']) .lightToggleIcon,
 :global([data-theme-choice='light']) .lightToggleIcon {
   display: block;
+  color: #f59e0b;
 }
 
 :global([data-theme='light']) .darkToggleIcon,
@@ -52,6 +63,7 @@
 :global([data-theme='dark']) .darkToggleIcon,
 :global([data-theme-choice='dark']) .darkToggleIcon {
   display: block;
+  color: #818cf8;
 }
 
 :global([data-theme='dark']) .lightToggleIcon,
