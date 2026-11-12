@@ -734,9 +734,10 @@ div[class*='announcementBar'] button[class*='close']:hover {
   border-radius: var(--radius-lg) !important;
   border: 1px solid var(--surface-border) !important;
   border-left-width: 4px !important;
-  padding: 1.25rem 1.5rem !important;
-  margin: 2rem 0 !important;
+  padding: 1.35rem 1.6rem !important;
+  margin: 2.25rem 0 !important;
   box-shadow: var(--shadow-subtle) !important;
+  backdrop-filter: blur(8px);
 }
 
 .theme-admonition-info {
