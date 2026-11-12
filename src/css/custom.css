@@ -162,6 +162,7 @@ html {
 body {
   font-family: var(--ifm-font-family-base);
   color: var(--ifm-font-color-base);
+  letter-spacing: -0.01em;
   background-color: var(--ifm-background-color);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
