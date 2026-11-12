@@ -400,6 +400,51 @@ const ChatWidget: React.FC = () => {
 
       {/* ---- Input area ---- */}
       <div className={styles.inputArea}>
+        {/* Quick Topic Chips Strip */}
+        <div className={styles.quickChipsStrip}>
+          <span className={styles.quickChipsLabel}>Quick Topics:</span>
+          <button
+            type="button"
+            className={styles.quickChip}
+            onClick={() => handleSendMessage('What are ROS 2 QoS policies for sub-ms motor control?')}
+            disabled={isLoading}
+          >
+            ROS 2 QoS
+          </button>
+          <button
+            type="button"
+            className={styles.quickChip}
+            onClick={() => handleSendMessage('How does Gazebo DART calculate contact friction for bipedal feet?')}
+            disabled={isLoading}
+          >
+            Gazebo Sim
+          </button>
+          <button
+            type="button"
+            className={styles.quickChip}
+            onClick={() => handleSendMessage('How does NVIDIA Isaac cuVSLAM compute stereo visual odometry?')}
+            disabled={isLoading}
+          >
+            cuVSLAM
+          </button>
+          <button
+            type="button"
+            className={styles.quickChip}
+            onClick={() => handleSendMessage('How does OpenVLA translate multimodal vision into joint actions?')}
+            disabled={isLoading}
+          >
+            OpenVLA
+          </button>
+          <button
+            type="button"
+            className={styles.quickChip}
+            onClick={() => handleSendMessage('Explain 3D-LIPM and Kajita ZMP preview control for stable walking.')}
+            disabled={isLoading}
+          >
+            3D-LIPM Locomotion
+          </button>
+        </div>
+
         <div className={styles.inputContainer}>
           <input
             ref={inputRef}
