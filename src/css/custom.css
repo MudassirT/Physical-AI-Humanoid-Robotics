@@ -919,6 +919,7 @@ button[class*='copyButton']:hover {
   border-top: 1px solid var(--surface-border);
   color: var(--ifm-font-color-secondary);
   padding: 5.5rem 0 3.5rem;
+  transition: border-color var(--transition-normal);
 }
 
 [data-theme='dark'] .footer {
