@@ -457,7 +457,7 @@ div[class*='announcementBar'] button[class*='close']:hover {
 }
 
 /* ============================================================
-   DOCUMENTATION SIDEBAR — Pro-Max Vertical Rail
+   DOCUMENTATION SIDEBAR — Ultra Pro Rail
    ============================================================ */
 .theme-doc-sidebar-container {
   border-right: 1px solid var(--surface-border) !important;
@@ -465,40 +465,41 @@ div[class*='announcementBar'] button[class*='close']:hover {
 }
 
 [data-theme='dark'] .theme-doc-sidebar-container {
-  background-color: #05070d !important;
+  background-color: #030712 !important;
   border-right-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .theme-doc-sidebar-menu {
-  padding: 1.5rem 0.85rem !important;
+  padding: 1.75rem 0.95rem !important;
   font-size: 0.92rem;
 }
 
 /* Category header / label */
 .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link {
+  font-family: var(--ifm-heading-font-family);
   font-weight: 750 !important;
-  font-size: 0.84rem !important;
-  letter-spacing: 0.03em !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.04em !important;
   text-transform: uppercase !important;
   color: var(--ifm-font-color-muted) !important;
-  padding: 0.55rem 0.75rem !important;
-  margin-top: 0.75rem !important;
+  padding: 0.6rem 0.85rem !important;
+  margin-top: 0.85rem !important;
   border-radius: var(--radius-sm) !important;
   border-left: none !important;
 }
 
 .theme-doc-sidebar-item-category > .menu__list-item-collapsible > .menu__link:hover {
   color: var(--ifm-color-primary) !important;
-  background-color: rgba(99, 102, 241, 0.06) !important;
+  background-color: rgba(99, 102, 241, 0.08) !important;
 }
 
-/* Link items */
+/* Sidebar Link items */
 .menu__link {
   border-radius: var(--radius-md) !important;
-  padding: 0.5rem 0.85rem !important;
+  padding: 0.55rem 0.95rem !important;
   color: var(--ifm-font-color-secondary) !important;
   font-weight: 500 !important;
-  font-size: 0.9rem !important;
+  font-size: 0.91rem !important;
   transition: all var(--transition-fast) !important;
 }
 
@@ -507,18 +508,18 @@ div[class*='announcementBar'] button[class*='close']:hover {
   background-color: rgba(99, 102, 241, 0.08) !important;
 }
 
-/* Active chapter item — Restored clean flush left vertical line */
+/* Active chapter item */
 .menu__list-item:not(.theme-doc-sidebar-item-category) > .menu__link--active,
 .menu__link--active:not(.menu__link--sublist) {
   color: var(--ifm-color-primary) !important;
-  background: rgba(99, 102, 241, 0.1) !important;
-  font-weight: 700 !important;
+  background: rgba(99, 102, 241, 0.12) !important;
+  font-weight: 750 !important;
   border-left: 3.5px solid var(--ifm-color-primary) !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
   border-top-right-radius: var(--radius-md) !important;
   border-bottom-right-radius: var(--radius-md) !important;
-  padding-left: 0.85rem !important;
+  padding-left: 0.95rem !important;
 }
 
 .menu__link--active::before {
@@ -528,8 +529,9 @@ div[class*='announcementBar'] button[class*='close']:hover {
 
 [data-theme='dark'] .menu__link--active:not(.menu__link--sublist) {
   color: #a5b4fc !important;
-  background: rgba(99, 102, 241, 0.16) !important;
+  background: rgba(99, 102, 241, 0.18) !important;
   border-left-color: #818cf8 !important;
+  box-shadow: inset 4px 0 12px -2px rgba(99, 102, 241, 0.3);
 }
 
 /* ============================================================
