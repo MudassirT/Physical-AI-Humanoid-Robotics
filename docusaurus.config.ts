@@ -270,6 +270,14 @@ const config: Config = {
     ],
     // Replace with your project's social card
     image: 'img/docusaurus-social-card.jpg',
+    announcementBar: {
+      id: 'physical_ai_curriculum_launch',
+      content:
+        '🚀 <strong>Physical AI & Humanoid Robotics Curriculum</strong>: 12 Core Engineering Modules covering ROS 2, NVIDIA Isaac & VLA are Live! <a href="/ai-book/intro">Start Reading →</a>',
+      backgroundColor: '#0f172a',
+      textColor: '#ffffff',
+      isCloseable: true,
+    },
     mermaid: {
       theme: {light: 'neutral', dark: 'dark'},
     },
