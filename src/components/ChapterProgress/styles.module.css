@@ -1,10 +1,10 @@
 .progressContainer {
-  margin: 2rem 0;
-  padding: 1.25rem 1.5rem;
-  background: var(--ifm-background-surface-color, #131722);
-  border: 1px solid var(--surface-border, rgba(255, 255, 255, 0.1));
-  border-radius: var(--radius-lg, 16px);
-  box-shadow: var(--shadow-card, 0 4px 20px rgba(0, 0, 0, 0.15));
+  margin: 2.25rem 0;
+  padding: 1.35rem 1.75rem;
+  background: var(--surface-elevated);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-xl, 20px);
+  box-shadow: var(--shadow-card);
   transition: all var(--transition-normal, 0.24s ease);
   position: relative;
   overflow: hidden;
@@ -18,7 +18,7 @@
   right: 0;
   height: 3px;
   background: linear-gradient(90deg, #4338ca 0%, #6366f1 50%, #06b6d4 100%);
-  opacity: 0.8;
+  opacity: 0.9;
 }
 
 .headerRow {
