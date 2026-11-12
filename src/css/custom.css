@@ -378,30 +378,49 @@ div[class*='announcementBar'] button[class*='close']:hover {
    BUTTONS — Micro-Interactions & Radiant Glow
    ============================================================ */
 .button {
+  font-family: var(--ifm-font-family-base);
   font-weight: 650;
   letter-spacing: -0.01em;
   border-radius: var(--radius-full);
-  transition: all var(--transition-fast) !important;
+  transition: all var(--transition-normal) !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.6rem;
-  padding: 0.85rem 1.75rem;
-  font-size: 0.95rem;
+  gap: 0.65rem;
+  padding: 0.85rem 1.85rem;
+  font-size: 0.96rem;
   cursor: pointer;
+  user-select: none;
+  position: relative;
+  overflow: hidden;
 }
 
 .button--primary {
-  background: linear-gradient(135deg, #4338ca 0%, #6366f1 60%, #06b6d4 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  background: linear-gradient(135deg, #4338ca 0%, #6366f1 55%, #06b6d4 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
   color: #ffffff !important;
-  box-shadow: 0 4px 16px rgba(79, 70, 229, 0.35);
+  box-shadow: 0 4px 18px rgba(79, 70, 229, 0.35);
+}
+
+.button--primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transition: left 600ms ease;
+}
+
+.button--primary:hover::before {
+  left: 100%;
 }
 
 .button--primary:hover {
-  background: linear-gradient(135deg, #3730a3 0%, #4f46e5 60%, #0284c7 100%) !important;
+  background: linear-gradient(135deg, #3730a3 0%, #4f46e5 55%, #0284c7 100%) !important;
   transform: translateY(-2px);
-  box-shadow: 0 8px 28px -2px rgba(99, 102, 241, 0.55), 0 0 16px rgba(6, 182, 212, 0.35) !important;
+  box-shadow: 0 10px 32px -2px rgba(99, 102, 241, 0.6), 0 0 20px rgba(6, 182, 212, 0.4) !important;
 }
 
 .button--primary:active {
@@ -413,11 +432,12 @@ div[class*='announcementBar'] button[class*='close']:hover {
   border: 1px solid var(--surface-border) !important;
   color: var(--ifm-font-color-base) !important;
   box-shadow: var(--shadow-subtle);
+  backdrop-filter: blur(12px);
 }
 
 .button--secondary:hover {
   background: var(--ifm-background-surface-color) !important;
-  border-color: rgba(99, 102, 241, 0.4) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
   color: var(--ifm-color-primary) !important;
   transform: translateY(-2px);
   box-shadow: var(--shadow-card);
@@ -426,14 +446,14 @@ div[class*='announcementBar'] button[class*='close']:hover {
 [data-theme='dark'] .button--secondary {
   background: rgba(255, 255, 255, 0.05) !important;
   border-color: rgba(255, 255, 255, 0.12) !important;
-  color: #ffffff !important;
-  backdrop-filter: blur(12px);
+  color: #f8fafc !important;
 }
 
 [data-theme='dark'] .button--secondary:hover {
   background: rgba(255, 255, 255, 0.1) !important;
   border-color: rgba(99, 102, 241, 0.6) !important;
   color: #ffffff !important;
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.25);
 }
 
 /* ============================================================
