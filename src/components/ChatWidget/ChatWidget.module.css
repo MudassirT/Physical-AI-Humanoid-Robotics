@@ -492,6 +492,66 @@
   flex-shrink: 0;
 }
 
+.quickChipsStrip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  overflow-x: auto;
+  padding-bottom: 0.35rem;
+  scrollbar-width: none;
+}
+
+.quickChipsStrip::-webkit-scrollbar {
+  display: none;
+}
+
+.quickChipsLabel {
+  font-size: 0.74rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ifm-font-color-muted);
+  white-space: nowrap;
+}
+
+.quickChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--surface-border);
+  color: var(--ifm-font-color-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+
+.quickChip:hover:not(:disabled) {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+  background: rgba(99, 102, 241, 0.1);
+  transform: translateY(-1px);
+}
+
+.quickChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+[data-theme='dark'] .quickChip {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='dark'] .quickChip:hover:not(:disabled) {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+}
+
 .inputContainer {
   display: flex;
   align-items: center;
