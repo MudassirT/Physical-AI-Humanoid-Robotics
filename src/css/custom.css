@@ -766,18 +766,19 @@ div[class*='announcementBar'] button[class*='close']:hover {
    CODE BLOCKS — Luxury macOS Terminal Presentation
    ============================================================ */
 div[class*='codeBlockContainer'] {
-  border-radius: var(--radius-lg, 18px) !important;
+  border-radius: var(--radius-xl, 20px) !important;
   border: 1px solid var(--surface-border) !important;
-  box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.12) !important;
-  margin: 1.85rem 0 !important;
-  background: #090d16 !important;
+  box-shadow: 0 8px 30px -4px rgba(15, 23, 42, 0.2) !important;
+  margin: 2rem 0 !important;
+  background: #070a14 !important;
   overflow: hidden !important;
+  position: relative;
 }
 
 [data-theme='dark'] div[class*='codeBlockContainer'] {
   border-color: rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
-  background: #060912 !important;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 20px rgba(99, 102, 241, 0.15) !important;
+  background: #050811 !important;
 }
 
 div[class*='codeBlockContainer'] pre {
@@ -785,7 +786,7 @@ div[class*='codeBlockContainer'] pre {
   font-size: 0.92rem !important;
   line-height: 1.7 !important;
   background: transparent !important;
-  padding: 1.35rem 1.6rem !important;
+  padding: 1.4rem 1.75rem !important;
   color: #f8fafc !important;
 }
 
@@ -795,7 +796,7 @@ div[class*='codeBlockContainer'] code {
   font-family: var(--ifm-font-family-monospace) !important;
 }
 
-/* Ensure all tokens & plain text inside code blocks have high contrast */
+/* High contrast token styling */
 div[class*='codeBlockContainer'] span[class*='codeBlockLines'],
 div[class*='codeBlockContainer'] span[class*='token-line'] {
   color: #f8fafc !important;
@@ -859,7 +860,7 @@ div[class*='codeBlockContainer'] .token.variable {
 /* Copy button */
 button[class*='copyButton'] {
   background: rgba(255, 255, 255, 0.12) !important;
-  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
   border-radius: var(--radius-sm) !important;
   color: #f8fafc !important;
   backdrop-filter: blur(8px);
