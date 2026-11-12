@@ -513,7 +513,7 @@ export default function HomepageFeatures(): ReactNode {
         ) : (
           <div className={styles.emptyState}>
             <p className={styles.emptyStateTitle}>No modules match "{searchQuery}"</p>
-            <p className={styles.emptyStateSub}>Try searching for "ROS 2", "Isaac", "VLA", "Locomotion", or "Reinforcement".</p>
+            <p className={styles.emptyStateSub}>Try searching for "ROS 2", "Isaac", "VLA", "Locomotion", "Dynamics", or "Reinforcement".</p>
             <button
               type="button"
               className="button button--secondary button--sm"
