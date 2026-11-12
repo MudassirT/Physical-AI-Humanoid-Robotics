@@ -407,7 +407,7 @@
    --------------------------------------------------------- */
 
 /* Module 1: Cyber Blue / Indigo */
-.modTheme1:hover { border-color: rgba(99, 102, 241, 0.6); box-shadow: 0 20px 48px -6px rgba(99, 102, 241, 0.3); }
+.modTheme1:hover { border-color: rgba(99, 102, 241, 0.6); box-shadow: 0 22px 50px -6px rgba(99, 102, 241, 0.35); }
 .modTheme1 .cardBadge, .modTheme1 .iconBox { background: rgba(99, 102, 241, 0.1); color: #4f46e5; border-color: rgba(99, 102, 241, 0.25); }
 [data-theme='dark'] .modTheme1 .cardBadge, [data-theme='dark'] .modTheme1 .iconBox { color: #818cf8; }
 .modTheme1:hover .iconBox { background: #6366f1; color: #ffffff; box-shadow: 0 4px 18px rgba(99, 102, 241, 0.5); }
