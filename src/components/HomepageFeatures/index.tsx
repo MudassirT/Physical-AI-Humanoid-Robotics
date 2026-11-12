@@ -1,4 +1,4 @@
-import React, { useState, type ReactNode } from 'react';
+import React, { useState, useMemo, type ReactNode } from 'react';
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
 import styles from './styles.module.css';
@@ -163,6 +163,24 @@ function ArrowRightIcon() {
   );
 }
 
+function SearchIcon() {
+  return (
+    <svg className={styles.searchIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function ClearIcon() {
+  return (
+    <svg className={styles.clearSearchIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Curriculum Data Model — All 12 Modules
 // ---------------------------------------------------------------------------
@@ -177,7 +195,7 @@ type FeatureItem = {
   duration: string;
   icon: ReactNode;
   title: string;
-  description: ReactNode;
+  description: string;
   bullets: string[];
   to: string;
 };
@@ -379,10 +397,23 @@ function Feature({ num, themeClass, level, duration, icon, title, description, b
 
 export default function HomepageFeatures(): ReactNode {
   const [selectedCategory, setSelectedCategory] = useState<ModuleCategory>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredFeatures = selectedCategory === 'all'
-    ? FeatureList
-    : FeatureList.filter((item) => item.category === selectedCategory);
+  const filteredFeatures = useMemo(() => {
+    return FeatureList.filter((item) => {
+      const matchesCategory = selectedCategory === 'all' || item.category === selectedCategory;
+      if (!matchesCategory) return false;
+      if (!searchQuery.trim()) return true;
+
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        item.title.toLowerCase().includes(q) ||
+        item.description.toLowerCase().includes(q) ||
+        item.level.toLowerCase().includes(q) ||
+        item.bullets.some((b) => b.toLowerCase().includes(q))
+      );
+    });
+  }, [selectedCategory, searchQuery]);
 
   return (
     <section id="curriculum-modules" className={styles.features}>
@@ -402,50 +433,96 @@ export default function HomepageFeatures(): ReactNode {
           An end-to-end engineering journey transitioning your capabilities from sub-millisecond motor communication to autonomous multimodal humanoid behavior.
         </p>
 
-        {/* Category Filter Pills */}
-        <div className={styles.categoryFilterBar}>
-          <button
-            type="button"
-            className={clsx(styles.filterBtn, selectedCategory === 'all' && styles.filterBtnActive)}
-            onClick={() => setSelectedCategory('all')}
-          >
-            All 12 Modules
-          </button>
-          <button
-            type="button"
-            className={clsx(styles.filterBtn, selectedCategory === 'foundations' && styles.filterBtnActive)}
-            onClick={() => setSelectedCategory('foundations')}
-          >
-            Phase 1: Foundations & Sim (1–3)
-          </button>
-          <button
-            type="button"
-            className={clsx(styles.filterBtn, selectedCategory === 'embodied' && styles.filterBtnActive)}
-            onClick={() => setSelectedCategory('embodied')}
-          >
-            Phase 2: Embodied AI & VLA (4–6)
-          </button>
-          <button
-            type="button"
-            className={clsx(styles.filterBtn, selectedCategory === 'learning' && styles.filterBtnActive)}
-            onClick={() => setSelectedCategory('learning')}
-          >
-            Phase 3: Dynamics & Learning (7–9)
-          </button>
-          <button
-            type="button"
-            className={clsx(styles.filterBtn, selectedCategory === 'systems' && styles.filterBtnActive)}
-            onClick={() => setSelectedCategory('systems')}
-          >
-            Phase 4: Hardware & Frontiers (10–12)
-          </button>
+        {/* Search & Filter Control Bar */}
+        <div className={styles.controlsWrapper}>
+          {/* Category Filter Pills */}
+          <div className={styles.categoryFilterBar}>
+            <button
+              type="button"
+              className={clsx(styles.filterBtn, selectedCategory === 'all' && styles.filterBtnActive)}
+              onClick={() => setSelectedCategory('all')}
+            >
+              All 12 Modules
+            </button>
+            <button
+              type="button"
+              className={clsx(styles.filterBtn, selectedCategory === 'foundations' && styles.filterBtnActive)}
+              onClick={() => setSelectedCategory('foundations')}
+            >
+              Phase 1: Foundations & Sim (1–3)
+            </button>
+            <button
+              type="button"
+              className={clsx(styles.filterBtn, selectedCategory === 'embodied' && styles.filterBtnActive)}
+              onClick={() => setSelectedCategory('embodied')}
+            >
+              Phase 2: Embodied AI & VLA (4–6)
+            </button>
+            <button
+              type="button"
+              className={clsx(styles.filterBtn, selectedCategory === 'learning' && styles.filterBtnActive)}
+              onClick={() => setSelectedCategory('learning')}
+            >
+              Phase 3: Dynamics & Learning (7–9)
+            </button>
+            <button
+              type="button"
+              className={clsx(styles.filterBtn, selectedCategory === 'systems' && styles.filterBtnActive)}
+              onClick={() => setSelectedCategory('systems')}
+            >
+              Phase 4: Hardware & Frontiers (10–12)
+            </button>
+          </div>
+
+          {/* Interactive Search Box */}
+          <div className={styles.searchBarContainer}>
+            <div className={styles.searchBox}>
+              <SearchIcon />
+              <input
+                type="text"
+                className={styles.searchInput}
+                placeholder="Search modules (e.g. ROS 2, Isaac, VLA, MPC, EtherCAT)..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                aria-label="Filter modules"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  className={styles.clearSearchBtn}
+                  onClick={() => setSearchQuery('')}
+                  title="Clear search"
+                >
+                  <ClearIcon />
+                </button>
+              )}
+            </div>
+            <div className={styles.resultsBadge}>
+              Showing <strong>{filteredFeatures.length}</strong> of 12 Modules
+            </div>
+          </div>
         </div>
 
-        <div className="row">
-          {filteredFeatures.map((props) => (
-            <Feature key={props.num} {...props} />
-          ))}
-        </div>
+        {/* Modules Grid */}
+        {filteredFeatures.length > 0 ? (
+          <div className="row">
+            {filteredFeatures.map((props) => (
+              <Feature key={props.num} {...props} />
+            ))}
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            <p className={styles.emptyStateTitle}>No modules match "{searchQuery}"</p>
+            <p className={styles.emptyStateSub}>Try searching for "ROS 2", "Isaac", "VLA", "Locomotion", or "Reinforcement".</p>
+            <button
+              type="button"
+              className="button button--secondary button--sm"
+              onClick={() => { setSearchQuery(''); setSelectedCategory('all'); }}
+            >
+              Reset Filters
+            </button>
+          </div>
+        )}
       </div>
     </section>
   );
